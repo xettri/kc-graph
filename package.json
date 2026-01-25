@@ -18,6 +18,9 @@
       }
     }
   },
+  "bin": {
+    "kc-graph": "./dist/esm/cli/cli.js"
+  },
   "files": [
     "dist",
     "LICENSE",

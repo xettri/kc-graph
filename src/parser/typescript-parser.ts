@@ -1,4 +1,5 @@
 import type { ParseResult, ParsedNodeInfo, ParsedEdgeInfo, ParserOptions } from './types.js';
+import { loadTypeScript } from './load-typescript.js';
 
 /**
  * Parse a TypeScript/JavaScript source file into graph nodes and edges.
@@ -15,16 +16,7 @@ export function parseTypeScriptSource(
   const includeJSDoc = options.includeJSDoc ?? true;
   const maxContentLength = options.maxContentLength ?? 5000;
 
-  let ts: typeof import('typescript');
-  try {
-    // Dynamic import of TypeScript (optional peer dep)
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    ts = require('typescript');
-  } catch {
-    throw new Error(
-      'TypeScript is required for parsing. Install it: npm install typescript',
-    );
-  }
+  const ts = loadTypeScript();
 
   const sourceFile = ts.createSourceFile(filePath, sourceCode, ts.ScriptTarget.Latest, true);
 

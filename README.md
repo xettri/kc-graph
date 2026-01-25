@@ -22,6 +22,40 @@ AI coding assistants waste tokens reading entire files to understand code. `kc-g
 npm install kc-graph
 ```
 
+For global CLI access:
+
+```bash
+npm install -g kc-graph
+```
+
+## CLI
+
+Index any project from the command line:
+
+```bash
+# Index a project (creates .kc-graph.json)
+kc-graph init
+
+# Index a specific directory
+kc-graph init ./my-project
+
+# Update an existing graph (re-indexes changed files, removes deleted ones)
+kc-graph sync
+
+# Verbose mode (shows each file)
+kc-graph init -V
+
+# Custom output path
+kc-graph init -o graph.json ./my-project
+```
+
+The CLI:
+- Automatically discovers `.ts`, `.tsx`, `.js`, `.jsx`, `.mts`, `.cts` source files
+- Indexes `.md` documentation files and links them to code symbols
+- Respects `.gitignore` rules
+- Skips binary files, `node_modules`, `dist`, `build`, and other non-source directories
+- Skips files larger than 1MB
+
 ## Quick Start
 
 ```typescript
