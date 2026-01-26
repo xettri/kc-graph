@@ -1,4 +1,4 @@
-import { readFileSync, statSync, readdirSync, existsSync, openSync, readSync, closeSync } from 'node:fs';
+import { readFileSync, statSync, lstatSync, readdirSync, existsSync, openSync, readSync, closeSync, realpathSync } from 'node:fs';
 import { join, relative, resolve, extname } from 'node:path';
 
 /** File extensions we know how to parse. */
@@ -72,7 +72,19 @@ function walk(
   ignoreRules: IgnoreRule[],
   results: DiscoveredFile[],
   includeUnknown: boolean,
+  visitedDirs?: Set<string>,
 ): void {
+  // Track visited real paths to detect symlink cycles
+  const visited = visitedDirs ?? new Set<string>();
+  let realDir: string;
+  try {
+    realDir = realpathSync(dir);
+  } catch {
+    return;
+  }
+  if (visited.has(realDir)) return;
+  visited.add(realDir);
+
   let entries: string[];
   try {
     entries = readdirSync(dir);
@@ -91,10 +103,21 @@ function walk(
       continue;
     }
 
+    // Skip symlinks pointing to directories (avoid cycles)
+    try {
+      const lstat = lstatSync(absPath);
+      if (lstat.isSymbolicLink() && stat.isDirectory()) {
+        const realTarget = realpathSync(absPath);
+        if (visited.has(realTarget)) continue;
+      }
+    } catch {
+      continue;
+    }
+
     if (stat.isDirectory()) {
       if (ALWAYS_SKIP_DIRS.has(entry)) continue;
       if (isIgnored(relPath + '/', ignoreRules)) continue;
-      walk(absPath, root, sourceExts, ignoreRules, results, includeUnknown);
+      walk(absPath, root, sourceExts, ignoreRules, results, includeUnknown, visited);
       continue;
     }
 

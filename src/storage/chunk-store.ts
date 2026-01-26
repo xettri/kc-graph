@@ -5,6 +5,7 @@ import {
   writeFileSync,
   readdirSync,
   unlinkSync,
+  renameSync,
   statSync,
 } from 'node:fs';
 import { join } from 'node:path';
@@ -150,14 +151,14 @@ export class ChunkStore {
     if (existsSync(path)) unlinkSync(path);
   }
 
-  /** Write the map file. */
+  /** Write the map file (atomic). */
   writeMap(map: StorageMap): void {
-    writeFileSync(join(this.storagePath, MAP_FILE), JSON.stringify(map));
+    atomicWrite(join(this.storagePath, MAP_FILE), JSON.stringify(map));
   }
 
-  /** Write the meta file. */
+  /** Write the meta file (atomic). */
   writeMeta(meta: StorageMeta): void {
-    writeFileSync(join(this.storagePath, META_FILE), JSON.stringify(meta, null, 2));
+    atomicWrite(join(this.storagePath, META_FILE), JSON.stringify(meta, null, 2));
   }
 
   // -------------------------------------------------------------------------
@@ -583,4 +584,14 @@ function float32ToBase64(arr: Float32Array): string {
 function base64ToFloat32(b64: string): Float32Array {
   const buf = Buffer.from(b64, 'base64');
   return new Float32Array(buf.buffer, buf.byteOffset, buf.byteLength / 4);
+}
+
+/**
+ * Write a file atomically: write to temp, then rename.
+ * Prevents corruption if the process crashes mid-write.
+ */
+function atomicWrite(filePath: string, data: string): void {
+  const tmpPath = filePath + '.tmp';
+  writeFileSync(tmpPath, data);
+  renameSync(tmpPath, filePath);
 }

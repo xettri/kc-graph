@@ -96,8 +96,10 @@ describe('TypeScript Parser', () => {
     it('should extract import edges', () => {
       const result = parseTypeScriptSource('src/auth.ts', SAMPLE_SOURCE);
       const imports = result.edges.filter((e) => e.type === 'imports');
-      expect(imports.length).toBe(1);
-      expect(imports[0]!.targetQualifiedName).toBe('./logger');
+      // File-level import + named import for Logger
+      expect(imports.length).toBe(2);
+      expect(imports.some((e) => e.targetQualifiedName === 'src/logger.ts')).toBe(true);
+      expect(imports.some((e) => e.targetQualifiedName === 'src/logger.ts#Logger')).toBe(true);
     });
 
     it('should extract contains edges', () => {
@@ -168,6 +170,214 @@ describe('TypeScript Parser', () => {
 
       const children = graph.getSuccessors(fileNode!.id, ['contains']);
       expect(children.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('arrow functions', () => {
+    const ARROW_SOURCE = `
+export const greet = (name: string): string => {
+  return format(name);
+};
+
+const format = (s: string) => s.trim();
+
+export const handler = async (req: Request): Promise<Response> => {
+  return new Response('ok');
+};
+`;
+
+    it('should extract arrow functions as function nodes', () => {
+      const result = parseTypeScriptSource('src/utils.ts', ARROW_SOURCE);
+      const fns = result.nodes.filter((n) => n.type === 'function');
+      expect(fns.some((n) => n.name === 'greet')).toBe(true);
+      expect(fns.some((n) => n.name === 'format')).toBe(true);
+      expect(fns.some((n) => n.name === 'handler')).toBe(true);
+    });
+
+    it('should mark arrow functions with isArrow metadata', () => {
+      const result = parseTypeScriptSource('src/utils.ts', ARROW_SOURCE);
+      const greet = result.nodes.find((n) => n.name === 'greet');
+      expect(greet!.metadata['isArrow']).toBe(true);
+    });
+
+    it('should generate correct signatures for arrow functions', () => {
+      const result = parseTypeScriptSource('src/utils.ts', ARROW_SOURCE);
+      const greet = result.nodes.find((n) => n.name === 'greet');
+      expect(greet!.signature).toContain('greet');
+      expect(greet!.signature).toContain('name: string');
+    });
+
+    it('should detect async arrow functions', () => {
+      const result = parseTypeScriptSource('src/utils.ts', ARROW_SOURCE);
+      const handler = result.nodes.find((n) => n.name === 'handler');
+      expect(handler!.signature).toContain('async');
+    });
+  });
+
+  describe('call extraction', () => {
+    const CALL_SOURCE = `
+function main() {
+  const result = helper();
+  process(result);
+}
+
+function helper(): string {
+  return 'data';
+}
+
+function process(data: string): void {
+  console.log(data);
+}
+
+const runner = () => {
+  main();
+};
+`;
+
+    it('should extract calls edges between functions', () => {
+      const graph = new CodeGraph();
+      indexSourceFile(graph, 'src/app.ts', CALL_SOURCE);
+
+      const edges = [...graph.allEdges()].filter((e) => e.type === 'calls');
+      expect(edges.length).toBeGreaterThan(0);
+
+      // main calls helper
+      const mainNode = graph.resolve('src/app.ts#main');
+      const helperNode = graph.resolve('src/app.ts#helper');
+      expect(mainNode).toBeDefined();
+      expect(helperNode).toBeDefined();
+
+      const mainCallsHelper = edges.some(
+        (e) => e.source === mainNode!.id && e.target === helperNode!.id,
+      );
+      expect(mainCallsHelper).toBe(true);
+    });
+
+    it('should extract calls from arrow functions', () => {
+      const graph = new CodeGraph();
+      indexSourceFile(graph, 'src/app.ts', CALL_SOURCE);
+
+      const edges = [...graph.allEdges()].filter((e) => e.type === 'calls');
+      const runnerNode = graph.resolve('src/app.ts#runner');
+      const mainNode = graph.resolve('src/app.ts#main');
+      expect(runnerNode).toBeDefined();
+
+      const runnerCallsMain = edges.some(
+        (e) => e.source === runnerNode!.id && e.target === mainNode!.id,
+      );
+      expect(runnerCallsMain).toBe(true);
+    });
+
+    it('should extract multiple calls from the same function', () => {
+      const graph = new CodeGraph();
+      indexSourceFile(graph, 'src/app.ts', CALL_SOURCE);
+
+      const edges = [...graph.allEdges()].filter((e) => e.type === 'calls');
+      const mainNode = graph.resolve('src/app.ts#main');
+
+      // main calls both helper and process
+      const mainCalls = edges.filter((e) => e.source === mainNode!.id);
+      expect(mainCalls.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  describe('class methods and constructors', () => {
+    const CLASS_SOURCE = `
+class Service {
+  constructor(private db: Database) {
+    this.init();
+  }
+
+  init(): void {}
+
+  async fetch(id: string): Promise<Data> {
+    return this.db.get(id);
+  }
+
+  handler = (event: Event) => {
+    this.fetch(event.id);
+  };
+}
+`;
+
+    it('should extract constructors', () => {
+      const result = parseTypeScriptSource('src/service.ts', CLASS_SOURCE);
+      const ctor = result.nodes.find((n) => n.name === 'constructor');
+      expect(ctor).toBeDefined();
+      expect(ctor!.qualifiedName).toBe('src/service.ts#Service.constructor');
+    });
+
+    it('should extract arrow function class properties', () => {
+      const result = parseTypeScriptSource('src/service.ts', CLASS_SOURCE);
+      const handler = result.nodes.find((n) => n.name === 'handler');
+      expect(handler).toBeDefined();
+      expect(handler!.qualifiedName).toBe('src/service.ts#Service.handler');
+    });
+
+    it('should extract calls from class methods', () => {
+      const graph = new CodeGraph();
+      indexSourceFile(graph, 'src/service.ts', CLASS_SOURCE);
+
+      const edges = [...graph.allEdges()].filter((e) => e.type === 'calls');
+      // constructor calls init
+      const ctor = graph.resolve('src/service.ts#Service.constructor');
+      const init = graph.resolve('src/service.ts#Service.init');
+      if (ctor && init) {
+        const ctorCallsInit = edges.some(
+          (e) => e.source === ctor.id && e.target === init.id,
+        );
+        expect(ctorCallsInit).toBe(true);
+      }
+    });
+  });
+
+  describe('import resolution', () => {
+    it('should resolve relative imports to file paths', () => {
+      const source = `import { foo } from './utils';`;
+      const result = parseTypeScriptSource('src/app.ts', source);
+      const imports = result.edges.filter((e) => e.type === 'imports');
+      expect(imports.some((e) => e.targetQualifiedName === 'src/utils.ts')).toBe(true);
+    });
+
+    it('should resolve parent directory imports', () => {
+      const source = `import { config } from '../config';`;
+      const result = parseTypeScriptSource('src/lib/app.ts', source);
+      const imports = result.edges.filter((e) => e.type === 'imports');
+      expect(imports.some((e) => e.targetQualifiedName === 'src/config.ts')).toBe(true);
+    });
+
+    it('should leave bare specifiers as-is', () => {
+      const source = `import express from 'express';`;
+      const result = parseTypeScriptSource('src/app.ts', source);
+      const imports = result.edges.filter((e) => e.type === 'imports');
+      expect(imports.some((e) => e.targetQualifiedName === 'express')).toBe(true);
+    });
+
+    it('should create named import edges', () => {
+      const source = `import { readFile, writeFile } from 'node:fs/promises';`;
+      const result = parseTypeScriptSource('src/io.ts', source);
+      const imports = result.edges.filter((e) => e.type === 'imports');
+      expect(imports.some((e) => e.targetQualifiedName === 'node:fs/promises#readFile')).toBe(true);
+      expect(imports.some((e) => e.targetQualifiedName === 'node:fs/promises#writeFile')).toBe(true);
+    });
+  });
+
+  describe('re-exports', () => {
+    it('should detect export { x } from "./mod"', () => {
+      const source = `export { helper } from './utils';`;
+      const result = parseTypeScriptSource('src/index.ts', source);
+      const exports = result.edges.filter((e) => e.type === 'exports');
+      expect(exports.some((e) => e.targetQualifiedName === 'src/utils.ts#helper')).toBe(true);
+    });
+
+    it('should detect local named exports', () => {
+      const source = `
+function foo() {}
+export { foo };
+`;
+      const result = parseTypeScriptSource('src/mod.ts', source);
+      const exports = result.edges.filter((e) => e.type === 'exports');
+      expect(exports.some((e) => e.targetQualifiedName === 'src/mod.ts#foo')).toBe(true);
     });
   });
 });
