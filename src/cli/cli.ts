@@ -5,7 +5,6 @@ import { existsSync } from 'node:fs';
 import { initProject, syncProject } from './indexer.js';
 
 const VERSION = '0.1.0';
-const GRAPH_FILE = '.kc-graph.json';
 
 // ---------------------------------------------------------------------------
 // Argument parsing (no deps)
@@ -14,7 +13,7 @@ const GRAPH_FILE = '.kc-graph.json';
 interface ParsedArgs {
   command: string;
   path: string;
-  output: string | undefined;
+  global: boolean;
   verbose: boolean;
   help: boolean;
   version: boolean;
@@ -24,7 +23,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   const args = argv.slice(2);
   let command = '';
   let path = '.';
-  let output: string | undefined;
+  let global = false;
   let verbose = false;
   let help = false;
   let version = false;
@@ -38,8 +37,8 @@ function parseArgs(argv: string[]): ParsedArgs {
       version = true;
     } else if (arg === '--verbose' || arg === '-V') {
       verbose = true;
-    } else if ((arg === '--output' || arg === '-o') && i + 1 < args.length) {
-      output = args[++i];
+    } else if (arg === '--global' || arg === '-g') {
+      global = true;
     } else if (arg === '--path' || arg === '-p') {
       if (i + 1 < args.length) {
         path = args[++i]!;
@@ -51,7 +50,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     }
   }
 
-  return { command, path, output, verbose, help, version };
+  return { command, path, global, verbose, help, version };
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +72,7 @@ Arguments:
   path          Project directory to index (default: current directory)
 
 Options:
-  -o, --output  Path to save the graph file (default: <path>/.kc-graph.json)
+  -g, --global  Store graph in ~/.kc-graph/ instead of local .kc-graph/
   -V, --verbose Show each file being indexed
   -h, --help    Show this help message
   -v, --version Show version
@@ -81,9 +80,9 @@ Options:
 Examples:
   kc-graph init                     Index current directory
   kc-graph init ./my-project        Index a specific project
+  kc-graph init --global            Store in global ~/.kc-graph/
   kc-graph sync                     Update the graph for current directory
   kc-graph sync ./my-project        Update graph for a specific project
-  kc-graph init -o graph.json .     Custom output path
 `);
 }
 
@@ -99,19 +98,12 @@ async function runInit(args: ParsedArgs): Promise<void> {
     process.exit(1);
   }
 
-  const graphPath = args.output ?? resolve(root, GRAPH_FILE);
-  if (existsSync(graphPath)) {
-    console.log(`Graph already exists at ${graphPath}`);
-    console.log('Use "kc-graph sync" to update, or delete the file and re-run init.');
-    process.exit(1);
-  }
-
   console.log(`Indexing ${root} ...`);
   const errors: string[] = [];
 
   const result = await initProject({
     root,
-    output: graphPath,
+    global: args.global,
     onProgress: args.verbose
       ? (file, i, total) => {
           process.stdout.write(`\r  [${i}/${total}] ${file}`);
@@ -130,10 +122,10 @@ async function runInit(args: ParsedArgs): Promise<void> {
 
   console.log('');
   console.log(`Done in ${(result.duration / 1000).toFixed(1)}s`);
-  console.log(`  ${result.sourceFiles} source files`);
-  console.log(`  ${result.docFiles} doc files`);
-  console.log(`  ${result.nodeCount} nodes, ${result.edgeCount} edges`);
-  console.log(`  Saved to ${result.graphPath}`);
+  console.log(`  ${result.totalFiles} files indexed`);
+  console.log(`  ${result.totalNodes} nodes, ${result.totalEdges} edges`);
+  console.log(`  ${result.totalChunks} chunks written`);
+  console.log(`  Saved to ${result.storagePath}`);
 
   if (errors.length > 0) {
     console.log('');
@@ -155,20 +147,12 @@ async function runSync(args: ParsedArgs): Promise<void> {
     process.exit(1);
   }
 
-  const graphPath = args.output ?? resolve(root, GRAPH_FILE);
-
-  if (!existsSync(graphPath)) {
-    console.log(`No existing graph found at ${graphPath}`);
-    console.log('Run "kc-graph init" first to create the graph.');
-    process.exit(1);
-  }
-
   console.log(`Syncing ${root} ...`);
   const errors: string[] = [];
 
   const result = await syncProject({
     root,
-    output: graphPath,
+    global: args.global,
     onProgress: args.verbose
       ? (file, i, total) => {
           process.stdout.write(`\r  [${i}/${total}] ${file}`);
@@ -188,8 +172,9 @@ async function runSync(args: ParsedArgs): Promise<void> {
   console.log('');
   console.log(`Done in ${(result.duration / 1000).toFixed(1)}s`);
   console.log(`  +${result.added} added, ~${result.updated} updated, -${result.removed} removed`);
-  console.log(`  ${result.nodeCount} nodes, ${result.edgeCount} edges`);
-  console.log(`  Saved to ${result.graphPath}`);
+  console.log(`  ${result.totalNodes} nodes, ${result.totalEdges} edges`);
+  console.log(`  ${result.chunksWritten} chunks written, ${result.chunksDeleted} deleted`);
+  console.log(`  Saved to ${result.storagePath}`);
 
   if (errors.length > 0) {
     console.log('');

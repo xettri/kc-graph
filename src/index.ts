@@ -45,6 +45,28 @@ export type { ParseResult, ParsedNodeInfo, ParsedEdgeInfo, ParserOptions } from 
 export { exportToJSON, importFromJSON, toJSONString, fromJSONString } from './serialization/json.js';
 export { saveToFile, loadFromFile, saveCompressed, loadCompressed } from './serialization/snapshot.js';
 
+// Storage (chunked persistence)
+export { ChunkStore } from './storage/chunk-store.js';
+export { resolveStore, createStore, listGlobalProjects, getGlobalStoragePath } from './storage/resolver.js';
+export { initProject, syncProject } from './storage/indexer.js';
+export type { IndexOptions } from './storage/indexer.js';
+export type {
+  StorageMeta,
+  StorageConfig,
+  StorageMap,
+  FileEntry,
+  ChunkMeta,
+  ChunkData,
+  SyncResult,
+  GlobalRegistry,
+  RegistryEntry,
+} from './storage/types.js';
+export { DEFAULT_CONFIG, generateChunkId } from './storage/types.js';
+
+// File Discovery
+export { discoverFiles } from './cli/discover.js';
+export type { DiscoverOptions, DiscoveredFile } from './cli/discover.js';
+
 // MCP
 export { toolDefinitions, createToolHandlers } from './mcp/tools.js';
 export type { ToolResult } from './mcp/tools.js';
