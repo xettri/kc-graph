@@ -102,7 +102,15 @@ const store = resolveStore('./my-project');
 const loaded = store.loadGraph();
 ```
 
-### 7. Start MCP Server (for AI agents)
+### 7. Visualize the Graph
+
+```bash
+kc-graph view
+```
+
+Opens an interactive graph visualization in your browser with force-directed layout, search, type filtering, and node inspection.
+
+### 8. Start MCP Server (for AI agents)
 
 ```bash
 kc-graph init

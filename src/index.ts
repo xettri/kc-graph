@@ -71,3 +71,7 @@ export type { DiscoverOptions, DiscoveredFile } from './cli/discover.js';
 export { toolDefinitions, createToolHandlers } from './mcp/tools.js';
 export { startMcpServer } from './mcp/server.js';
 export type { ToolResult } from './mcp/tools.js';
+
+// Viewer
+export { startViewer, exportViewerHTML } from './cli/viewer.js';
+export type { ViewerOptions } from './cli/viewer.js';

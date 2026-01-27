@@ -12,6 +12,7 @@ export default defineConfig({
       { text: 'Guide', link: '/guide/getting-started' },
       { text: 'API', link: '/guide/api-reference' },
       { text: 'Examples', link: '/examples/basic-usage' },
+      { text: 'Graph Viewer', link: '/graph.html', target: '_blank' },
       {
         text: 'GitHub',
         link: 'https://github.com/xettri/kc-graph',

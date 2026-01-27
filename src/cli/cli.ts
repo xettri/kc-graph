@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs';
 import { initProject, syncProject } from './indexer.js';
 import { resolveStore } from '../storage/resolver.js';
 import { startMcpServer } from '../mcp/server.js';
+import { startViewer } from './viewer.js';
 
 const VERSION = '0.1.0';
 
@@ -19,6 +20,7 @@ interface ParsedArgs {
   verbose: boolean;
   help: boolean;
   version: boolean;
+  port: number;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -29,6 +31,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   let verbose = false;
   let help = false;
   let version = false;
+  let port = 4242;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!;
@@ -41,6 +44,10 @@ function parseArgs(argv: string[]): ParsedArgs {
       verbose = true;
     } else if (arg === '--global' || arg === '-g') {
       global = true;
+    } else if (arg === '--port' || arg === '-P') {
+      if (i + 1 < args.length) {
+        port = parseInt(args[++i]!, 10) || 4242;
+      }
     } else if (arg === '--path' || arg === '-p') {
       if (i + 1 < args.length) {
         path = args[++i]!;
@@ -52,7 +59,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     }
   }
 
-  return { command, path, global, verbose, help, version };
+  return { command, path, global, verbose, help, version, port };
 }
 
 // ---------------------------------------------------------------------------
@@ -69,6 +76,7 @@ Usage:
 Commands:
   init          Index a project and create the knowledge graph
   sync          Update an existing graph (re-index changed files, remove deleted)
+  view          Open interactive graph visualization in browser
   mcp           Start MCP stdio server (for AI agent integration)
 
 Arguments:
@@ -76,6 +84,7 @@ Arguments:
 
 Options:
   -g, --global  Store graph in ~/.kc-graph/ instead of local .kc-graph/
+  -P, --port    Port for the viewer server (default: 4242)
   -V, --verbose Show each file being indexed
   -h, --help    Show this help message
   -v, --version Show version
@@ -86,6 +95,8 @@ Examples:
   kc-graph init --global            Store in global ~/.kc-graph/
   kc-graph sync                     Update the graph for current directory
   kc-graph sync ./my-project        Update graph for a specific project
+  kc-graph view                     Open graph viewer in browser
+  kc-graph view --port 8080         Use custom port
   kc-graph mcp                      Start MCP server for current project
   kc-graph mcp ./my-project         Start MCP server for a specific project
 `);
@@ -193,6 +204,26 @@ async function runSync(args: ParsedArgs): Promise<void> {
   }
 }
 
+async function runView(args: ParsedArgs): Promise<void> {
+  const root = resolve(args.path);
+
+  if (!existsSync(root)) {
+    console.error(`Error: directory not found: ${root}`);
+    process.exit(1);
+  }
+
+  const store = resolveStore(root, { global: args.global });
+
+  if (!store.exists()) {
+    console.error(`No graph found for ${root}`);
+    console.error('Run "kc-graph init" first to index the project.');
+    process.exit(1);
+  }
+
+  const graph = store.loadGraph();
+  startViewer(graph, { port: args.port });
+}
+
 async function runMcp(args: ParsedArgs): Promise<void> {
   const root = resolve(args.path);
 
@@ -245,6 +276,9 @@ async function main(): Promise<void> {
     case 'sync':
     case 'update':
       await runSync(args);
+      break;
+    case 'view':
+      await runView(args);
       break;
     case 'mcp':
     case 'serve':

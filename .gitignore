@@ -5,6 +5,7 @@ coverage/
 .DS_Store
 *.log
 .env
+.kc-graph/
 .kc-graph.json
 .kc-graph.cache
 docs/.vitepress/dist/

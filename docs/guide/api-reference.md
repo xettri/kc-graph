@@ -218,3 +218,24 @@ import { toolDefinitions, createToolHandlers, startMcpServer } from 'kc-graph';
 | `toolDefinitions` | MCP tool schemas (search_code, get_context, get_impact, get_structure, find_similar) |
 | `createToolHandlers(graph)` | Create handler functions bound to a graph |
 | `startMcpServer(graph)` | Start stdio MCP server (JSON-RPC over stdin/stdout) |
+
+## Viewer
+
+```typescript
+import { startViewer, exportViewerHTML } from 'kc-graph';
+```
+
+| Function | Description |
+|----------|-------------|
+| `startViewer(graph, options?)` | Start local HTTP server with interactive graph visualization |
+| `exportViewerHTML(graph)` | Export self-contained HTML string for static hosting |
+
+### ViewerOptions
+
+```typescript
+startViewer(graph, {
+  port: 4242,        // HTTP port (default: 4242)
+  host: 'localhost', // Bind address
+  open: true,        // Auto-open browser (default: true)
+});
+```
