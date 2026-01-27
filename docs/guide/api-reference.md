@@ -163,7 +163,33 @@ import { parseTypeScriptSource, indexSourceFile, indexDocFile } from 'kc-graph';
 | `indexSourceFile(graph, filePath, source, options?)` | Parse and add to graph |
 | `indexDocFile(graph, filePath, content)` | Parse markdown and add to graph |
 
-## Serialization
+## Storage (Chunked Persistence)
+
+```typescript
+import { ChunkStore, resolveStore, createStore, initProject, syncProject } from 'kc-graph';
+```
+
+| Function / Class | Description |
+|------------------|-------------|
+| `initProject(options?)` | Index a project from scratch (returns `SyncResult`) |
+| `syncProject(options?)` | Incremental sync — only re-index changed files |
+| `resolveStore(projectRoot, options?)` | Find existing storage (local first, then global) |
+| `createStore(projectRoot, options?)` | Create new storage |
+| `ChunkStore` | Low-level chunked storage (init, saveGraph, loadGraph, syncFiles, cleanup) |
+
+### IndexOptions
+
+```typescript
+await initProject({
+  root: './my-project',       // Project directory
+  global: false,              // Use global ~/.kc-graph/ storage
+  config: { chunkSize: 262144 }, // Storage config overrides
+  onProgress: (file, i, total) => { },
+  onError: (file, error) => { },
+});
+```
+
+## Serialization (Legacy Single-File)
 
 ```typescript
 import { exportToJSON, importFromJSON, toJSONString, fromJSONString } from 'kc-graph';
@@ -184,10 +210,11 @@ import { saveToFile, loadFromFile, saveCompressed, loadCompressed } from 'kc-gra
 ## MCP
 
 ```typescript
-import { toolDefinitions, createToolHandlers } from 'kc-graph';
+import { toolDefinitions, createToolHandlers, startMcpServer } from 'kc-graph';
 ```
 
 | Export | Description |
 |--------|-------------|
 | `toolDefinitions` | MCP tool schemas (search_code, get_context, get_impact, get_structure, find_similar) |
 | `createToolHandlers(graph)` | Create handler functions bound to a graph |
+| `startMcpServer(graph)` | Start stdio MCP server (JSON-RPC over stdin/stdout) |

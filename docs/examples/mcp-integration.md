@@ -1,43 +1,61 @@
 # MCP Integration
 
-This example shows how to expose kc-graph as an MCP server for AI agents.
+## Quick Start (CLI)
 
-## Setup
+The easiest way to use kc-graph with AI agents:
+
+```bash
+# Index your project
+kc-graph init
+
+# Start MCP server over stdio
+kc-graph mcp
+```
+
+Configure your AI client to use it:
+
+```json
+{
+  "mcpServers": {
+    "kc-graph": {
+      "command": "kc-graph",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+## Programmatic Setup
 
 ```typescript
-import {
-  CodeGraph,
-  indexSourceFile,
-  loadFromFile,
-  saveToFile,
-  createToolHandlers,
-  toolDefinitions,
-} from 'kc-graph';
+import { resolveStore, startMcpServer } from 'kc-graph';
 
-// Load or build the graph
-let graph: CodeGraph;
-try {
-  graph = await loadFromFile('.kc-graph.json');
-} catch {
-  graph = new CodeGraph();
-  // Index your project...
-  await saveToFile(graph, '.kc-graph.json');
-}
+// Load graph from .kc-graph/ directory
+const store = resolveStore('/path/to/project');
+const graph = store.loadGraph();
 
-// Create tool handlers
+// Start stdio MCP server
+startMcpServer(graph);
+```
+
+## Using Tool Handlers Directly
+
+If you're building your own MCP server or integration:
+
+```typescript
+import { createToolHandlers, toolDefinitions } from 'kc-graph';
+
 const handlers = createToolHandlers(graph);
 ```
 
-## Tool Definitions
-
-kc-graph exports MCP-compatible tool schemas:
+### Tool Definitions
 
 ```typescript
 console.log(Object.keys(toolDefinitions));
 // ['search_code', 'get_context', 'get_impact', 'get_structure', 'find_similar']
 ```
 
-## Handling Tool Calls
+### Handling Tool Calls
 
 ```typescript
 // Search for code
@@ -80,7 +98,7 @@ const similarResult = handlers.find_similar({
 });
 ```
 
-## Error Handling
+### Error Handling
 
 All handlers return `{ content, isError? }`:
 

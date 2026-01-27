@@ -2,7 +2,7 @@
 
 ## TypeScript/JavaScript Parser
 
-kc-graph includes a built-in parser that uses the TypeScript Compiler API to extract code entities from source files.
+kc-graph includes a built-in parser that uses the TypeScript Compiler API to extract code entities and their relationships from source files.
 
 ### Requirements
 
@@ -26,14 +26,80 @@ console.log(`Indexed ${nodeCount} nodes`);
 
 ### What Gets Extracted
 
-The parser extracts:
+The parser extracts entities and their relationships:
 
-- **Functions** — name, signature, body, JSDoc, line numbers
-- **Classes** — name, heritage (extends/implements), methods
-- **Variables** — name, const/let distinction, initializer
-- **Types** — interfaces and type aliases
-- **Imports** — module specifiers
-- **Exports** — exported symbols
+| Feature | Node Type | Edge Types |
+|---------|-----------|------------|
+| Function declarations | `function` | `contains`, `exports` |
+| Arrow functions (`const fn = () => {}`) | `function` | `contains`, `exports` |
+| Function expressions | `function` | `contains`, `exports` |
+| Class declarations | `class` | `contains`, `exports` |
+| Class methods | `function` | `contains` |
+| Constructors | `function` | `contains` |
+| Arrow class properties (`handler = () => {}`) | `function` | `contains` |
+| Variables and constants | `variable` | `contains`, `exports` |
+| Interfaces and type aliases | `type` | `contains`, `exports` |
+| Heritage clauses | — | `extends`, `implements` |
+
+### Call Extraction
+
+The parser walks function and method bodies to extract **call edges**:
+
+```typescript
+const source = `
+export function main() {
+  const result = helper();    // → calls edge: main → helper
+  process(result);            // → calls edge: main → process
+}
+
+function helper() { return 'data'; }
+
+const runner = () => {
+  main();                     // → calls edge: runner → main
+};
+`;
+
+indexSourceFile(graph, 'src/app.ts', source);
+
+// The graph now has calls edges between functions
+const edges = [...graph.allEdges()].filter(e => e.type === 'calls');
+// main → helper, main → process, runner → main
+```
+
+Detected call patterns:
+- Direct calls: `foo()`
+- Method calls: `this.method()`, `obj.method()`
+- Constructor calls: `new Foo()`
+- Calls inside arrow functions and class methods
+
+### Import Resolution
+
+Relative imports are resolved to actual file paths:
+
+```typescript
+// In src/lib/app.ts:
+import { helper } from './utils';    // → resolves to src/lib/utils.ts
+import { config } from '../config';  // → resolves to src/config.ts
+import express from 'express';       // → stays as 'express' (bare specifier)
+```
+
+Named imports create edges to specific symbols:
+
+```typescript
+import { readFile, writeFile } from 'node:fs/promises';
+// Creates edges:
+//   src/app.ts → node:fs/promises          (file-level import)
+//   src/app.ts → node:fs/promises#readFile  (named import)
+//   src/app.ts → node:fs/promises#writeFile (named import)
+```
+
+Re-exports are also detected:
+
+```typescript
+export { helper } from './utils';     // import + export edges
+export * from './types';              // star re-export
+export { foo, bar };                  // local named exports
+```
 
 ### Parser Options
 
@@ -68,29 +134,30 @@ indexDocFile(graph, 'README.md', readme);
 
 The doc parser:
 1. Creates a doc node for the file
-2. Splits into sections by headings
+2. Splits into sections by headings (tracks heading level)
 3. Links doc sections to code nodes when backtick-wrapped symbol names are found (e.g., `` `login` ``)
 
 ## Index an Entire Project
 
+### Using the CLI (recommended)
+
+```bash
+kc-graph init ./my-project
+```
+
+### Using the Library API
+
 ```typescript
-import { CodeGraph, indexSourceFile, indexDocFile } from 'kc-graph';
-import { readFileSync } from 'fs';
-import { globSync } from 'fs';
+import { initProject, syncProject } from 'kc-graph';
 
-const graph = new CodeGraph();
+// Full index
+const result = await initProject({
+  root: './my-project',
+  onProgress: (file, i, total) => console.log(`${i}/${total}: ${file}`),
+});
+console.log(`${result.totalNodes} nodes, ${result.totalEdges} edges in ${result.totalChunks} chunks`);
 
-// Index all TypeScript files
-const tsFiles = globSync('src/**/*.ts');
-for (const file of tsFiles) {
-  indexSourceFile(graph, file, readFileSync(file, 'utf-8'));
-}
-
-// Index docs
-const mdFiles = globSync('docs/**/*.md');
-for (const file of mdFiles) {
-  indexDocFile(graph, file, readFileSync(file, 'utf-8'));
-}
-
-console.log(`Graph: ${graph.nodeCount} nodes, ${graph.edgeCount} edges`);
+// Incremental sync (only changed files)
+const sync = await syncProject({ root: './my-project' });
+console.log(`+${sync.added} added, ~${sync.updated} updated, -${sync.removed} removed`);
 ```

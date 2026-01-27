@@ -10,10 +10,12 @@
 AI coding assistants waste tokens reading entire files to understand code. `kc-graph` builds a **graph-based knowledge centre** that maps your codebase at the symbol level, so AI agents get exactly the context they need — nothing more.
 
 - **Impact Analysis** — "If I change function X, what else breaks?"
+- **Call Graph Extraction** — Traces function calls, arrow functions, method invocations
 - **Token-Optimized Context** — Extract the most relevant code within a token budget
 - **Symbol-Level Graph** — Functions, classes, variables, types, and their relationships
 - **Semantic Search** — Find similar code using embedding vectors
-- **MCP Integration** — Ready-to-use tool definitions for AI agent frameworks
+- **MCP Server** — Built-in stdio server for AI agent integration (`kc-graph mcp`)
+- **Chunked Storage** — Size-based splitting for large codebases, local or global
 - **Zero Runtime Dependencies** — Only TypeScript as an optional peer dep for parsing
 
 ## Install
@@ -30,31 +32,69 @@ npm install -g kc-graph
 
 ## CLI
 
-Index any project from the command line:
-
 ```bash
-# Index a project (creates .kc-graph.json)
+# Index a project (creates .kc-graph/ directory with chunked storage)
 kc-graph init
 
 # Index a specific directory
 kc-graph init ./my-project
 
-# Update an existing graph (re-indexes changed files, removes deleted ones)
+# Store graph globally (~/.kc-graph/) instead of locally
+kc-graph init --global
+
+# Update an existing graph (only re-indexes changed files)
 kc-graph sync
+
+# Start MCP server for AI agents (Claude Code, etc.)
+kc-graph mcp
 
 # Verbose mode (shows each file)
 kc-graph init -V
-
-# Custom output path
-kc-graph init -o graph.json ./my-project
 ```
 
 The CLI:
 - Automatically discovers `.ts`, `.tsx`, `.js`, `.jsx`, `.mts`, `.cts` source files
+- Extracts **function calls**, **arrow functions**, **class methods**, **constructors**
+- Resolves relative imports (`./utils` → `src/utils.ts`)
 - Indexes `.md` documentation files and links them to code symbols
-- Respects `.gitignore` rules
+- Respects `.gitignore` rules with symlink cycle detection
 - Skips binary files, `node_modules`, `dist`, `build`, and other non-source directories
 - Skips files larger than 1MB
+
+## MCP Server
+
+The fastest way to give AI agents deep codebase understanding:
+
+```bash
+# 1. Index your project
+kc-graph init
+
+# 2. Start MCP server (stdio JSON-RPC)
+kc-graph mcp
+```
+
+Configure in your AI client (e.g. Claude Code `settings.json`):
+
+```json
+{
+  "mcpServers": {
+    "kc-graph": {
+      "command": "kc-graph",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+The server exposes 5 tools:
+
+| Tool | Description |
+|------|-------------|
+| `search_code` | Find functions, classes, variables by name/pattern |
+| `get_context` | Token-optimized context for a symbol or file |
+| `get_impact` | What breaks if you change this symbol? |
+| `get_structure` | File structure — classes, functions, exports |
+| `find_similar` | Semantically similar code (requires embeddings) |
 
 ## Quick Start
 
@@ -66,72 +106,99 @@ const graph = new CodeGraph();
 
 // Index a source file (requires TypeScript as peer dep)
 const source = `
-export function login(user: string, pass: string): Token {
-  const valid = validate(user, pass);
-  return generateToken(user);
-}
+export const greet = (name: string): string => {
+  return format(name);
+};
 
-function validate(user: string, pass: string): boolean {
-  return user.length > 0 && pass.length > 8;
-}
-
-function generateToken(user: string): Token {
-  return { token: crypto.randomUUID(), user };
+function format(name: string): string {
+  return name.trim().toUpperCase();
 }
 `;
 
-indexSourceFile(graph, 'src/auth.ts', source);
+indexSourceFile(graph, 'src/greet.ts', source);
 
-// Query the graph
-const loginFn = graph.resolve('login');
-console.log(loginFn?.signature);
-// → "async function login(user: string, pass: string): Token"
+// Query the graph — arrow functions are extracted too
+const greetFn = graph.resolve('greet');
+console.log(greetFn?.signature);
+// → "const greet = (name: string): string"
+
+// Call edges are extracted automatically
+const edges = [...graph.allEdges()].filter(e => e.type === 'calls');
+// → greet calls format
 
 // Get AI-optimized context (respects token budget)
-const context = buildContext(graph, [loginFn!.id], {
+const context = buildContext(graph, [greetFn!.id], {
   maxTokens: 2000,
   includeSignatures: true,
   includeDoc: true,
   depth: 3,
 });
 console.log(context.context);
-console.log(`Estimated tokens: ${context.estimatedTokens}`);
 
 // Analyze change impact
-const impact = analyzeImpact(graph, loginFn!.id);
-console.log(`Changing login() impacts ${impact.stats.totalImpacted} symbols`);
+const impact = analyzeImpact(graph, greetFn!.id);
+console.log(`Changing greet() impacts ${impact.stats.totalImpacted} symbols`);
 ```
 
-## Core Concepts
+## Storage
 
-### Nodes (Code Entities)
+kc-graph uses **chunked file storage** for efficient persistence:
 
-| Type | Description |
-|------|-------------|
-| `file` | A source file |
-| `module` | A module/namespace |
-| `class` | A class definition |
-| `function` | A function or method |
-| `variable` | A variable/constant |
-| `type` | A type/interface definition |
-| `export` | An export declaration |
-| `doc` | Documentation (README, JSDoc) |
-| `snippet` | A code snippet for RAG |
+```bash
+.kc-graph/
+├── meta.json          # Version, config, stats
+├── map.json           # File → chunk mapping
+└── chunks/
+    ├── a1b2c3.json    # Chunk with nodes + edges
+    ├── d4e5f6.json
+    └── ...
+```
 
-### Edges (Relationships)
+- Files are grouped by directory, split by size (default 256KB chunks)
+- Only changed chunks are rewritten during sync
+- Chunk IDs are opaque short hex UUIDs
+- Local `.kc-graph/` takes priority over global `~/.kc-graph/`
 
-| Type | Description |
-|------|-------------|
-| `contains` | File contains function, class contains method |
-| `calls` | Function A calls function B |
-| `imports` | File A imports from file B |
-| `extends` | Class A extends class B |
-| `implements` | Class implements interface |
-| `references` | Function references variable |
-| `exports` | File exports symbol |
-| `depends_on` | Module A depends on module B |
-| `documents` | Doc node documents code node |
-| `tagged_with` | Entity tagged with a category |
+### Programmatic Storage API
+
+```typescript
+import { initProject, syncProject, resolveStore, ChunkStore } from 'kc-graph';
+
+// Index a project (same as CLI `kc-graph init`)
+const result = await initProject({
+  root: '/path/to/project',
+  onProgress: (file, i, total) => console.log(`${i}/${total}: ${file}`),
+});
+
+// Sync changes (same as CLI `kc-graph sync`)
+const syncResult = await syncProject({ root: '/path/to/project' });
+
+// Low-level: load graph from storage
+const store = resolveStore('/path/to/project');
+const graph = store.loadGraph();
+```
+
+## Parser Features
+
+The TypeScript parser extracts:
+
+| Feature | Edge Type |
+|---------|-----------|
+| Function declarations | `contains`, `exports` |
+| Arrow functions (`const fn = () => {}`) | `contains`, `exports` |
+| Function expressions | `contains`, `exports` |
+| Class declarations + methods | `contains`, `exports` |
+| Constructors | `contains` |
+| Arrow class properties (`handler = () => {}`) | `contains` |
+| Function calls within bodies | `calls` |
+| `new` expressions | `calls` |
+| Import declarations | `imports` |
+| Named imports (`import { X }`) | `imports` (to `file#X`) |
+| Relative import resolution | `./foo` → `dir/foo.ts` |
+| Re-exports (`export { x } from './mod'`) | `imports` + `exports` |
+| Heritage clauses | `extends`, `implements` |
+| Variables and constants | `contains`, `exports` |
+| Interfaces and type aliases | `contains`, `exports` |
 
 ## API
 
@@ -212,52 +279,6 @@ const results = findSimilar(graph, queryEmbedding, 10, 0.5);
 // → [{ node: CodeNode, score: 0.95 }, ...]
 ```
 
-### Serialization
-
-```typescript
-import { toJSONString, fromJSONString, saveToFile, loadFromFile } from 'kc-graph';
-
-// JSON string (sync)
-const json = toJSONString(graph);
-const restored = fromJSONString(json);
-
-// File persistence (async)
-await saveToFile(graph, '.kc-graph.json');
-const loaded = await loadFromFile('.kc-graph.json');
-
-// Compressed (for large codebases)
-import { saveCompressed, loadCompressed } from 'kc-graph';
-await saveCompressed(graph, '.kc-graph.cache');
-```
-
-### MCP Integration
-
-```typescript
-import { createToolHandlers, toolDefinitions } from 'kc-graph';
-
-// Get MCP tool schemas (for registering with your MCP server)
-console.log(toolDefinitions);
-
-// Create handlers bound to your graph
-const handlers = createToolHandlers(graph);
-
-// Handle a tool call
-const result = handlers.search_code({ query: 'login', type: 'function' });
-const context = handlers.get_context({ symbol: 'login', maxTokens: 2000 });
-const impact = handlers.get_impact({ symbol: 'login' });
-const structure = handlers.get_structure({ path: 'src/auth.ts' });
-```
-
-## Using with Claude Code
-
-kc-graph can be used as an MCP server with Claude Code to give the AI deep understanding of your codebase:
-
-1. Index your project once (save to `.kc-graph.json`)
-2. Register the MCP tools with your Claude Code setup
-3. The AI queries the graph instead of reading entire files
-
-This dramatically reduces token usage while giving the AI better understanding of code relationships.
-
 ## Performance
 
 kc-graph is built with V8 engine optimizations in mind:
@@ -268,6 +289,8 @@ kc-graph is built with V8 engine optimizations in mind:
 - **Generator-based traversals** — lazy evaluation, never materializes full result sets
 - **Array-backed BFS queue** — avoids `shift()` O(n) cost with head pointer
 - **Loop-unrolled cosine similarity** — 4 elements per iteration for better ILP
+- **Chunked storage** — size-based splitting, only rewrites affected chunks on sync
+- **Atomic writes** — write-to-temp + rename prevents corruption on crash
 
 ## License
 

@@ -52,7 +52,8 @@ import { readFileSync } from 'fs';
 
 const source = readFileSync('src/auth.ts', 'utf-8');
 indexSourceFile(graph, 'src/auth.ts', source);
-// Automatically extracts functions, classes, variables, types, imports, and edges
+// Extracts functions, arrow functions, classes, variables, types,
+// imports, call edges, and relationships automatically
 ```
 
 ### 4. Query the Graph
@@ -90,14 +91,27 @@ console.log(`${ctx.estimatedTokens} tokens, ${ctx.files.length} files`);
 ### 6. Save & Load
 
 ```typescript
-import { saveToFile, loadFromFile } from 'kc-graph';
+import { initProject, syncProject, resolveStore } from 'kc-graph';
 
-await saveToFile(graph, '.kc-graph.json');
-const loaded = await loadFromFile('.kc-graph.json');
+// Option A: Use the high-level API (chunked storage)
+await initProject({ root: './my-project' });
+await syncProject({ root: './my-project' }); // incremental updates
+
+// Option B: Load an existing graph
+const store = resolveStore('./my-project');
+const loaded = store.loadGraph();
+```
+
+### 7. Start MCP Server (for AI agents)
+
+```bash
+kc-graph init
+kc-graph mcp
 ```
 
 ## Next Steps
 
 - [Core Concepts](/guide/core-concepts) — understand nodes, edges, and the graph model
+- [Parsing & Indexing](/guide/parsing) — call extraction, arrow functions, import resolution
 - [AI Context Builder](/guide/ai-context) — token-budget-aware retrieval
-- [Claude Code Integration](/guide/claude-code) — use with AI assistants
+- [Claude Code Integration](/guide/claude-code) — MCP server setup

@@ -1,62 +1,48 @@
 # Claude Code Integration
 
-kc-graph is designed to work seamlessly with AI coding assistants like Claude Code. Here's how to set it up.
+kc-graph includes a built-in MCP server that gives AI agents deep codebase understanding out of the box.
 
-## Overview
+## Quick Setup
 
-Instead of the AI reading entire files to understand your code, kc-graph provides a pre-built knowledge graph that the AI can query. This:
+```bash
+# 1. Index your project
+kc-graph init
 
-- Reduces token usage by 60-90%
-- Gives the AI better understanding of code relationships
-- Enables impact analysis before making changes
-- Provides semantic search across the codebase
-
-## Setup as MCP Server
-
-### 1. Index Your Project
-
-Create a script to index your codebase:
-
-```typescript
-// scripts/index-project.ts
-import { CodeGraph, indexSourceFile, indexDocFile, saveToFile } from 'kc-graph';
-import { readFileSync } from 'fs';
-import { globSync } from 'fs';
-
-const graph = new CodeGraph();
-
-// Index source files
-for (const file of globSync('src/**/*.{ts,tsx,js,jsx}')) {
-  indexSourceFile(graph, file, readFileSync(file, 'utf-8'));
-}
-
-// Index docs
-for (const file of globSync('{docs,*.md}/**/*.md')) {
-  indexDocFile(graph, file, readFileSync(file, 'utf-8'));
-}
-
-await saveToFile(graph, '.kc-graph.json');
-console.log(`Indexed: ${graph.nodeCount} nodes, ${graph.edgeCount} edges`);
+# 2. Start MCP server
+kc-graph mcp
 ```
 
-### 2. Create MCP Server
+That's it. The server loads the graph from `.kc-graph/` and serves 5 tools over stdio.
 
-```typescript
-// mcp-server.ts
-import { CodeGraph, loadFromFile, createToolHandlers, toolDefinitions } from 'kc-graph';
+## Configure Claude Code
 
-// Load the pre-built graph
-const graph = await loadFromFile('.kc-graph.json');
-const handlers = createToolHandlers(graph);
+Add to your Claude Code `settings.json`:
 
-// Register tools with your MCP server framework
-// The exact setup depends on your MCP server implementation
-for (const [name, schema] of Object.entries(toolDefinitions)) {
-  server.registerTool(schema, (args) => handlers[name](args));
+```json
+{
+  "mcpServers": {
+    "kc-graph": {
+      "command": "kc-graph",
+      "args": ["mcp"]
+    }
+  }
 }
 ```
 
-### 3. Available MCP Tools
+For a specific project path:
+
+```json
+{
+  "mcpServers": {
+    "kc-graph": {
+      "command": "kc-graph",
+      "args": ["mcp", "/path/to/project"]
+    }
+  }
+}
+```
+
+## Available MCP Tools
 
 | Tool | Description | Input |
 |------|-------------|-------|
@@ -66,13 +52,22 @@ for (const [name, schema] of Object.entries(toolDefinitions)) {
 | `get_structure` | File structure overview | `{ path }` |
 | `find_similar` | Find semantically similar code | `{ symbol, file?, limit? }` |
 
-## Example AI Workflow
+## Why This Helps
+
+Instead of the AI reading entire files to understand your code, kc-graph provides a pre-built knowledge graph. This:
+
+- Reduces token usage by 60-90%
+- Gives the AI understanding of call chains and dependencies
+- Enables impact analysis before making changes
+- Provides semantic search across the codebase
+
+## Example AI Workflows
 
 ### Code Review
 
 1. AI receives a diff
 2. AI calls `get_impact` for each changed function
-3. AI gets a clear picture of what else might break
+3. AI sees exactly what else breaks — across files, through call chains
 4. AI provides targeted review comments
 
 ### Code Generation
@@ -81,35 +76,39 @@ for (const [name, schema] of Object.entries(toolDefinitions)) {
 2. AI calls `search_code` to find related existing code
 3. AI calls `get_context` to understand the surrounding code
 4. AI calls `get_structure` to see where to add the new code
-5. AI generates code that fits the existing patterns
+5. AI generates code that fits existing patterns
 
 ### Bug Investigation
 
 1. User reports a bug in function X
 2. AI calls `get_context` for function X with high token budget
-3. AI follows `calls` and `references` edges via impact analysis
+3. AI follows `calls` and `imports` edges via impact analysis
 4. AI traces the bug to its root cause through the graph
 
 ## Keeping the Graph Updated
 
-Re-index when files change. Add this to your workflow:
-
 ```bash
-# Re-index on file save (using a file watcher)
-npx tsx scripts/index-project.ts
+# Sync on file changes (only re-indexes changed files)
+kc-graph sync
 ```
 
-Or integrate incremental updates:
+Or programmatically:
 
 ```typescript
-import { indexSourceFile, loadFromFile, saveToFile } from 'kc-graph';
+import { syncProject } from 'kc-graph';
 
-const graph = await loadFromFile('.kc-graph.json');
+const result = await syncProject({ root: '/path/to/project' });
+console.log(`+${result.added} added, ~${result.updated} updated, -${result.removed} removed`);
+```
 
-// Only re-index changed files
-for (const changedFile of getChangedFiles()) {
-  indexSourceFile(graph, changedFile, readFileSync(changedFile, 'utf-8'));
-}
+## Programmatic Server
 
-await saveToFile(graph, '.kc-graph.json');
+You can also start the MCP server from code:
+
+```typescript
+import { resolveStore, startMcpServer } from 'kc-graph';
+
+const store = resolveStore('/path/to/project');
+const graph = store.loadGraph();
+startMcpServer(graph);
 ```
