@@ -69,4 +69,5 @@ export type { DiscoverOptions, DiscoveredFile } from './cli/discover.js';
 
 // MCP
 export { toolDefinitions, createToolHandlers } from './mcp/tools.js';
+export { startMcpServer } from './mcp/server.js';
 export type { ToolResult } from './mcp/tools.js';

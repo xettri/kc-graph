@@ -3,6 +3,8 @@
 import { resolve } from 'node:path';
 import { existsSync } from 'node:fs';
 import { initProject, syncProject } from './indexer.js';
+import { resolveStore } from '../storage/resolver.js';
+import { startMcpServer } from '../mcp/server.js';
 
 const VERSION = '0.1.0';
 
@@ -67,6 +69,7 @@ Usage:
 Commands:
   init          Index a project and create the knowledge graph
   sync          Update an existing graph (re-index changed files, remove deleted)
+  mcp           Start MCP stdio server (for AI agent integration)
 
 Arguments:
   path          Project directory to index (default: current directory)
@@ -83,6 +86,8 @@ Examples:
   kc-graph init --global            Store in global ~/.kc-graph/
   kc-graph sync                     Update the graph for current directory
   kc-graph sync ./my-project        Update graph for a specific project
+  kc-graph mcp                      Start MCP server for current project
+  kc-graph mcp ./my-project         Start MCP server for a specific project
 `);
 }
 
@@ -188,6 +193,34 @@ async function runSync(args: ParsedArgs): Promise<void> {
   }
 }
 
+async function runMcp(args: ParsedArgs): Promise<void> {
+  const root = resolve(args.path);
+
+  if (!existsSync(root)) {
+    console.error(`Error: directory not found: ${root}`);
+    process.exit(1);
+  }
+
+  const store = resolveStore(root, { global: args.global });
+
+  if (!store.exists()) {
+    console.error(`No graph found for ${root}`);
+    console.error('Run "kc-graph init" first to index the project.');
+    process.exit(1);
+  }
+
+  // Load graph and start MCP server
+  const graph = store.loadGraph();
+  const meta = store.readMeta();
+
+  // Log to stderr (stdout is reserved for MCP protocol)
+  process.stderr.write(
+    `kc-graph MCP server started (${meta.stats.nodes} nodes, ${meta.stats.edges} edges)\n`,
+  );
+
+  startMcpServer(graph);
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -212,6 +245,10 @@ async function main(): Promise<void> {
     case 'sync':
     case 'update':
       await runSync(args);
+      break;
+    case 'mcp':
+    case 'serve':
+      await runMcp(args);
       break;
     default:
       console.error(`Unknown command: ${args.command}`);
