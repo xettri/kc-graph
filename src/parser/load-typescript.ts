@@ -1,6 +1,9 @@
 /**
  * Load the TypeScript compiler API.
- * Works in both ESM and CJS by using module.createRequire.
+ *
+ * Prefers the project's own TypeScript (resolved from cwd) so files are parsed
+ * with the same version the project uses. Falls back to the copy bundled with
+ * kc-graph (a direct dependency) so parsing always works.
  */
 
 import { createRequire } from 'node:module';
@@ -10,8 +13,8 @@ let _ts: typeof import('typescript') | null = null;
 export function loadTypeScript(): typeof import('typescript') {
   if (_ts) return _ts;
 
-  // Try multiple resolution anchors — the project being indexed (cwd) may have
-  // TypeScript installed locally even when kc-graph is installed globally.
+  // 1. Try the project being indexed (cwd) — prefer its TS version.
+  // 2. Fall back to kc-graph's own bundled TypeScript.
   const anchors: string[] = [
     process.cwd() + '/__kc_graph_resolve__.js',
   ];
@@ -30,6 +33,6 @@ export function loadTypeScript(): typeof import('typescript') {
   }
 
   throw new Error(
-    'TypeScript is required for parsing. Install it: npm install typescript',
+    'Failed to load TypeScript. This should not happen — please report this issue.',
   );
 }
