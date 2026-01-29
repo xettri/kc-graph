@@ -10,19 +10,26 @@ let _ts: typeof import('typescript') | null = null;
 export function loadTypeScript(): typeof import('typescript') {
   if (_ts) return _ts;
 
-  try {
-    // createRequire works in both ESM and CJS.
-    // In ESM, __filename is not defined, so we use process.argv[1] or cwd as anchor.
-    const anchor =
-      typeof __filename !== 'undefined'
-        ? __filename
-        : process.cwd() + '/__kc_graph_resolve__.js';
-    const localRequire = createRequire(anchor);
-    _ts = localRequire('typescript') as typeof import('typescript');
-    return _ts;
-  } catch {
-    throw new Error(
-      'TypeScript is required for parsing. Install it: npm install typescript',
-    );
+  // Try multiple resolution anchors — the project being indexed (cwd) may have
+  // TypeScript installed locally even when kc-graph is installed globally.
+  const anchors: string[] = [
+    process.cwd() + '/__kc_graph_resolve__.js',
+  ];
+  if (typeof __filename !== 'undefined') {
+    anchors.push(__filename);
   }
+
+  for (const anchor of anchors) {
+    try {
+      const localRequire = createRequire(anchor);
+      _ts = localRequire('typescript') as typeof import('typescript');
+      return _ts;
+    } catch {
+      // try next anchor
+    }
+  }
+
+  throw new Error(
+    'TypeScript is required for parsing. Install it: npm install typescript',
+  );
 }
