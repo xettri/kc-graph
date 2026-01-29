@@ -35,7 +35,8 @@
     "README.md"
   ],
   "scripts": {
-    "build": "npm run build:esm && npm run build:cjs",
+    "clean": "rm -rf dist",
+    "build": "npm run clean && npm run build:esm && npm run build:cjs",
     "build:esm": "tsc -p tsconfig.build.json",
     "build:cjs": "tsc -p tsconfig.cjs.json && echo '{\"type\":\"commonjs\"}' > dist/cjs/package.json",
     "test": "vitest run",
@@ -45,10 +46,12 @@
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
     "typecheck": "tsc --noEmit",
+    "prepack": "npm run build && npm run typecheck",
+    "local:install": "npm pack && npm install -g ./kc-graph-*.tgz",
+    "local:uninstall": "npm uninstall -g kc-graph",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs",
-    "prepublishOnly": "npm run build"
+    "docs:preview": "vitepress preview docs"
   },
   "keywords": [
     "knowledge-graph",
@@ -62,7 +65,7 @@
     "ast",
     "typescript"
   ],
-  "author": "",
+  "author": "xettri",
   "license": "MIT",
   "engines": {
     "node": ">=18.0.0"
