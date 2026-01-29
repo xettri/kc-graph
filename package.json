@@ -47,8 +47,8 @@
     "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
     "typecheck": "tsc --noEmit",
     "prepack": "npm run build && npm run typecheck",
-    "local:install": "npm pack && npm install -g ./kc-graph-*.tgz",
-    "local:uninstall": "npm uninstall -g kc-graph",
+    "local:link": "npm run build && npm link",
+    "local:unlink": "npm unlink -g kc-graph",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs"
