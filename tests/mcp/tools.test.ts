@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { CodeGraph } from '../../src/core/graph.js';
-import { createToolHandlers } from '../../src/mcp/tools.js';
+import { createToolHandlers, singleProject } from '../../src/mcp/tools.js';
+import type { ProjectMap } from '../../src/mcp/tools.js';
 
 function buildGraph(): CodeGraph {
   const g = new CodeGraph();
@@ -20,13 +21,37 @@ function buildGraph(): CodeGraph {
   return g;
 }
 
+function buildSecondGraph(): CodeGraph {
+  const g = new CodeGraph();
+
+  g.addNode({ id: 'lib/auth.ts', type: 'file', name: 'auth.ts', qualifiedName: 'lib/auth.ts', content: '', signature: '', location: { file: 'lib/auth.ts', startLine: 1, endLine: 30, startColumn: 0, endColumn: 0 }, metadata: {} });
+  g.addNode({ id: 'lib/auth.ts#login', type: 'function', name: 'login', qualifiedName: 'lib/auth.ts#login', content: 'function login() {}', signature: '(user: string) => boolean', location: { file: 'lib/auth.ts', startLine: 2, endLine: 10, startColumn: 0, endColumn: 1 }, metadata: {} });
+  g.addNode({ id: 'lib/auth.ts#logout', type: 'function', name: 'logout', qualifiedName: 'lib/auth.ts#logout', content: 'function logout() {}', signature: '() => void', location: { file: 'lib/auth.ts', startLine: 12, endLine: 15, startColumn: 0, endColumn: 1 }, metadata: {} });
+
+  g.addEdge({ source: 'lib/auth.ts', target: 'lib/auth.ts#login', type: 'contains', weight: 1, metadata: {} });
+  g.addEdge({ source: 'lib/auth.ts', target: 'lib/auth.ts#logout', type: 'contains', weight: 1, metadata: {} });
+
+  return g;
+}
+
 describe('MCP Tools', () => {
   let graph: CodeGraph;
   let handlers: ReturnType<typeof createToolHandlers>;
 
   beforeEach(() => {
     graph = buildGraph();
-    handlers = createToolHandlers(graph);
+    handlers = createToolHandlers(singleProject('my-app', graph, '/tmp/my-app'));
+  });
+
+  describe('list_projects', () => {
+    it('should list single project', () => {
+      const result = handlers['list_projects']!({});
+      const data = JSON.parse(result.content[0]!.text);
+      expect(data).toHaveLength(1);
+      expect(data[0].name).toBe('my-app');
+      expect(data[0].nodes).toBe(6);
+      expect(data[0].edges).toBe(4);
+    });
   });
 
   describe('search_code', () => {
@@ -132,7 +157,6 @@ describe('MCP Tools', () => {
     });
 
     it('should find similar with embeddings', () => {
-      // Add embeddings
       const mainNode = graph.getNode('src/app.ts#main')!;
       mainNode.embedding = new Float32Array([1, 0, 0, 0]);
       const helperNode = graph.getNode('src/app.ts#helper')!;
@@ -144,8 +168,88 @@ describe('MCP Tools', () => {
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(result.content[0]!.text);
       expect(data.length).toBeGreaterThan(0);
-      // helper should be more similar to main than format
       expect(data[0].name).toBe('helper');
+    });
+  });
+});
+
+describe('MCP Tools — Multi-project', () => {
+  let projects: ProjectMap;
+  let handlers: ReturnType<typeof createToolHandlers>;
+
+  beforeEach(() => {
+    projects = new Map([
+      ['my-app', { graph: buildGraph(), path: '/tmp/my-app' }],
+      ['auth-service', { graph: buildSecondGraph(), path: '/tmp/auth-service' }],
+    ]);
+    handlers = createToolHandlers(projects);
+  });
+
+  describe('list_projects', () => {
+    it('should list all projects', () => {
+      const result = handlers['list_projects']!({});
+      const data = JSON.parse(result.content[0]!.text);
+      expect(data).toHaveLength(2);
+      const names = data.map((p: { name: string }) => p.name);
+      expect(names).toContain('my-app');
+      expect(names).toContain('auth-service');
+    });
+  });
+
+  describe('search_code', () => {
+    it('should search across all projects', () => {
+      const result = handlers['search_code']!({ query: 'login' });
+      const data = JSON.parse(result.content[0]!.text);
+      expect(data.length).toBe(1);
+      expect(data[0].name).toBe('login');
+      expect(data[0].project).toBe('auth-service');
+    });
+
+    it('should include project field in multi-project results', () => {
+      const result = handlers['search_code']!({ query: 'main' });
+      const data = JSON.parse(result.content[0]!.text);
+      expect(data[0].project).toBe('my-app');
+    });
+
+    it('should filter by project', () => {
+      const result = handlers['search_code']!({ query: 'main', project: 'auth-service' });
+      const data = JSON.parse(result.content[0]!.text);
+      expect(data.length).toBe(0);
+    });
+
+    it('should error for unknown project', () => {
+      const result = handlers['search_code']!({ query: 'main', project: 'nonexistent' });
+      expect(result.isError).toBe(true);
+    });
+  });
+
+  describe('get_context', () => {
+    it('should find symbol across projects', () => {
+      const result = handlers['get_context']!({ symbol: 'login' });
+      expect(result.isError).toBeUndefined();
+      expect(result.content[0]!.text).toContain('auth-service');
+    });
+
+    it('should scope to specific project', () => {
+      const result = handlers['get_context']!({ symbol: 'main', project: 'my-app' });
+      expect(result.isError).toBeUndefined();
+    });
+  });
+
+  describe('get_impact', () => {
+    it('should find symbol in correct project', () => {
+      const result = handlers['get_impact']!({ symbol: 'login' });
+      expect(result.isError).toBeUndefined();
+      expect(result.content[0]!.text).toContain('auth-service');
+    });
+  });
+
+  describe('get_structure', () => {
+    it('should find file in correct project', () => {
+      const result = handlers['get_structure']!({ path: 'lib/auth.ts' });
+      expect(result.isError).toBeUndefined();
+      const data = JSON.parse(result.content[0]!.text);
+      expect(data.some((s: { name: string }) => s.name === 'login')).toBe(true);
     });
   });
 });

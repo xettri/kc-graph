@@ -25,17 +25,41 @@ Configure your AI client to use it:
 }
 ```
 
+Run `kc-graph setup` to get the config snippet for your tool.
+
+## Multi-Project Mode
+
+Index multiple projects into the global store and serve them from a single MCP server:
+
+```bash
+kc-graph init --global ~/work/api-server
+kc-graph init --global ~/work/frontend
+kc-graph init --global ~/work/shared-lib
+
+# One server, all projects
+kc-graph mcp --global
+```
+
+```json
+{
+  "mcpServers": {
+    "kc-graph": {
+      "command": "kc-graph",
+      "args": ["mcp", "--global"]
+    }
+  }
+}
+```
+
 ## Programmatic Setup
 
 ```typescript
-import { resolveStore, startMcpServer } from 'kc-graph';
+import { resolveStore, startMcpServer, singleProject } from 'kc-graph';
 
-// Load graph from .kc-graph/ directory
 const store = resolveStore('/path/to/project');
 const graph = store.loadGraph();
 
-// Start stdio MCP server
-startMcpServer(graph);
+startMcpServer(singleProject('my-project', graph, '/path/to/project'));
 ```
 
 ## Using Tool Handlers Directly
@@ -43,22 +67,28 @@ startMcpServer(graph);
 If you're building your own MCP server or integration:
 
 ```typescript
-import { createToolHandlers, toolDefinitions } from 'kc-graph';
+import { createToolHandlers, singleProject, toolDefinitions } from 'kc-graph';
 
-const handlers = createToolHandlers(graph);
+const projects = singleProject('my-project', graph, '/path/to/project');
+const handlers = createToolHandlers(projects);
 ```
 
 ### Tool Definitions
 
 ```typescript
 console.log(Object.keys(toolDefinitions));
-// ['search_code', 'get_context', 'get_impact', 'get_structure', 'find_similar']
+// ['list_projects', 'search_code', 'get_context', 'get_impact', 'get_structure', 'find_similar']
 ```
 
 ### Handling Tool Calls
 
 ```typescript
-// Search for code
+// List indexed projects
+const projectList = handlers.list_projects({});
+console.log(projectList.content[0].text);
+// [{ name: "my-project", path: "/path/to/project", nodes: 142, edges: 89, files: 12 }]
+
+// Search for code (optional project filter in multi-project mode)
 const searchResult = handlers.search_code({
   query: 'login',
   type: 'function',

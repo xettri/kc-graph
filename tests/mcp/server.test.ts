@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Readable, Writable, PassThrough } from 'node:stream';
 import { CodeGraph } from '../../src/core/graph.js';
-import { toolDefinitions, createToolHandlers } from '../../src/mcp/tools.js';
+import { toolDefinitions, createToolHandlers, singleProject } from '../../src/mcp/tools.js';
 
 /**
  * Test the MCP server protocol handling in-process.
@@ -25,7 +25,7 @@ function handleMcpMessage(
   graph: CodeGraph,
   msg: { jsonrpc: string; id?: number; method?: string; params?: Record<string, unknown> },
 ): object | null {
-  const handlers = createToolHandlers(graph);
+  const handlers = createToolHandlers(singleProject('test', graph, '/tmp/test'));
 
   switch (msg.method) {
     case 'initialize':
@@ -96,13 +96,14 @@ describe('MCP Server Protocol', () => {
     expect(resp.result.protocolVersion).toBe('2024-11-05');
   });
 
-  it('should list all 5 tools', () => {
+  it('should list all 6 tools', () => {
     const resp = handleMcpMessage(graph, {
       jsonrpc: '2.0', id: 2, method: 'tools/list',
     }) as any;
 
-    expect(resp.result.tools.length).toBe(5);
+    expect(resp.result.tools.length).toBe(6);
     const names = resp.result.tools.map((t: any) => t.name);
+    expect(names).toContain('list_projects');
     expect(names).toContain('search_code');
     expect(names).toContain('get_context');
     expect(names).toContain('get_impact');

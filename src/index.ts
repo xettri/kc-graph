@@ -47,7 +47,7 @@ export { saveToFile, loadFromFile, saveCompressed, loadCompressed } from './seri
 
 // Storage (chunked persistence)
 export { ChunkStore } from './storage/chunk-store.js';
-export { resolveStore, createStore, listGlobalProjects, getGlobalStoragePath } from './storage/resolver.js';
+export { resolveStore, createStore, listGlobalProjects, loadAllGlobalProjects, getGlobalStoragePath } from './storage/resolver.js';
 export { initProject, syncProject } from './storage/indexer.js';
 export type { IndexOptions } from './storage/indexer.js';
 export type {
@@ -68,9 +68,9 @@ export { discoverFiles } from './cli/discover.js';
 export type { DiscoverOptions, DiscoveredFile } from './cli/discover.js';
 
 // MCP
-export { toolDefinitions, createToolHandlers } from './mcp/tools.js';
+export { toolDefinitions, createToolHandlers, singleProject } from './mcp/tools.js';
 export { startMcpServer } from './mcp/server.js';
-export type { ToolResult } from './mcp/tools.js';
+export type { ToolResult, ProjectMap, ProjectEntry } from './mcp/tools.js';
 
 // Viewer
 export { startViewer, exportViewerHTML } from './cli/viewer.js';

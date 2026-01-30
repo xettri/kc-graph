@@ -6,11 +6,7 @@
 npm install kc-graph
 ```
 
-For TypeScript/JavaScript parsing, install TypeScript as a peer dependency:
-
-```bash
-npm install typescript
-```
+TypeScript is included as a dependency — no extra install needed.
 
 ## Quick Start
 
@@ -113,9 +109,23 @@ Opens an interactive graph visualization in your browser with force-directed lay
 ### 8. Start MCP Server (for AI agents)
 
 ```bash
+# Single project
 kc-graph init
 kc-graph mcp
+
+# Multi-project (global store)
+kc-graph init --global ~/work/project-a
+kc-graph init --global ~/work/project-b
+kc-graph mcp --global
 ```
+
+### 9. Setup MCP in your AI tool
+
+```bash
+kc-graph setup
+```
+
+Prints the config snippet for Claude Code, Cursor, and other MCP clients.
 
 ## Next Steps
 

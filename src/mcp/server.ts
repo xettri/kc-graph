@@ -1,14 +1,9 @@
 import { toolDefinitions, createToolHandlers } from './tools.js';
-import type { CodeGraph } from '../core/graph.js';
+import type { ProjectMap } from './tools.js';
 
-/**
- * MCP stdio server — implements the Model Context Protocol over stdin/stdout.
- * JSON-RPC 2.0 with Content-Length framing.
- *
- * Usage: pipe stdin/stdout to an MCP client (e.g. Claude Code).
- */
-export function startMcpServer(graph: CodeGraph): void {
-  const handlers = createToolHandlers(graph);
+/** MCP stdio server (JSON-RPC 2.0 with Content-Length framing). */
+export function startMcpServer(projects: ProjectMap): void {
+  const handlers = createToolHandlers(projects);
   let buffer = '';
 
   process.stdin.setEncoding('utf-8');

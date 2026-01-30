@@ -12,7 +12,7 @@ kc-graph init
 kc-graph mcp
 ```
 
-That's it. The server loads the graph from `.kc-graph/` and serves 5 tools over stdio.
+The server loads the graph from `.kc-graph/` and serves 6 tools over stdio.
 
 ## Configure Claude Code
 
@@ -42,15 +42,41 @@ For a specific project path:
 }
 ```
 
+## Multi-Project Mode
+
+Index multiple projects globally and serve them from one MCP server:
+
+```bash
+kc-graph init --global ~/work/api-server
+kc-graph init --global ~/work/frontend
+kc-graph mcp --global
+```
+
+```json
+{
+  "mcpServers": {
+    "kc-graph": {
+      "command": "kc-graph",
+      "args": ["mcp", "--global"]
+    }
+  }
+}
+```
+
+Run `kc-graph setup` to get the config snippet.
+
 ## Available MCP Tools
 
 | Tool | Description | Input |
 |------|-------------|-------|
-| `search_code` | Find functions, classes, variables | `{ query, type?, file? }` |
-| `get_context` | Token-optimized context for a symbol | `{ symbol, file?, maxTokens? }` |
-| `get_impact` | Change impact analysis | `{ symbol, file?, maxDepth? }` |
-| `get_structure` | File structure overview | `{ path }` |
-| `find_similar` | Find semantically similar code | `{ symbol, file?, limit? }` |
+| `list_projects` | List all indexed projects with stats | `{}` |
+| `search_code` | Find functions, classes, variables | `{ query, type?, file?, project? }` |
+| `get_context` | Token-optimized context for a symbol | `{ symbol?, file?, maxTokens?, project? }` |
+| `get_impact` | Change impact analysis | `{ symbol, file?, maxDepth?, project? }` |
+| `get_structure` | File structure overview | `{ path, project? }` |
+| `find_similar` | Find semantically similar code | `{ symbol, file?, limit?, project? }` |
+
+All tools accept an optional `project` parameter in multi-project mode to scope queries.
 
 ## Why This Helps
 
@@ -106,9 +132,9 @@ console.log(`+${result.added} added, ~${result.updated} updated, -${result.remov
 You can also start the MCP server from code:
 
 ```typescript
-import { resolveStore, startMcpServer } from 'kc-graph';
+import { resolveStore, startMcpServer, singleProject } from 'kc-graph';
 
 const store = resolveStore('/path/to/project');
 const graph = store.loadGraph();
-startMcpServer(graph);
+startMcpServer(singleProject('my-project', graph, '/path/to/project'));
 ```

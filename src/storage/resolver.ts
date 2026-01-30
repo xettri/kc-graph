@@ -3,6 +3,7 @@ import { join, resolve, basename } from 'node:path';
 import { homedir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { ChunkStore } from './chunk-store.js';
+import type { CodeGraph } from '../core/graph.js';
 import type { GlobalRegistry, RegistryEntry, StorageConfig } from './types.js';
 
 const LOCAL_DIR = '.kc-graph';
@@ -129,6 +130,25 @@ function writeRegistry(registry: GlobalRegistry): void {
 export function listGlobalProjects(): RegistryEntry[] {
   const registry = readRegistry();
   return Object.values(registry.projects);
+}
+
+export function loadAllGlobalProjects(): Map<string, { graph: CodeGraph; store: ChunkStore; path: string }> {
+  const registry = readRegistry();
+  const result = new Map<string, { graph: CodeGraph; store: ChunkStore; path: string }>();
+
+  for (const [projectId, entry] of Object.entries(registry.projects)) {
+    const storePath = join(GLOBAL_DIR, 'projects', projectId);
+    try {
+      const store = new ChunkStore(storePath);
+      if (!store.exists()) continue;
+      const graph = store.loadGraph();
+      result.set(entry.name, { graph, store, path: entry.path });
+    } catch {
+      // Skip corrupt/unreadable projects
+    }
+  }
+
+  return result;
 }
 
 export function getGlobalStoragePath(): string {

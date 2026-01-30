@@ -1,11 +1,3 @@
-/**
- * Load the TypeScript compiler API.
- *
- * Prefers the project's own TypeScript (resolved from cwd) so files are parsed
- * with the same version the project uses. Falls back to the copy bundled with
- * kc-graph (a direct dependency) so parsing always works.
- */
-
 import { createRequire } from 'node:module';
 
 let _ts: typeof import('typescript') | null = null;
@@ -13,8 +5,7 @@ let _ts: typeof import('typescript') | null = null;
 export function loadTypeScript(): typeof import('typescript') {
   if (_ts) return _ts;
 
-  // 1. Try the project being indexed (cwd) — prefer its TS version.
-  // 2. Fall back to kc-graph's own bundled TypeScript.
+  // Prefer the project's own TypeScript, fall back to bundled version
   const anchors: string[] = [
     process.cwd() + '/__kc_graph_resolve__.js',
   ];

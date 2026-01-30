@@ -210,14 +210,17 @@ import { saveToFile, loadFromFile, saveCompressed, loadCompressed } from 'kc-gra
 ## MCP
 
 ```typescript
-import { toolDefinitions, createToolHandlers, startMcpServer } from 'kc-graph';
+import { toolDefinitions, createToolHandlers, singleProject, startMcpServer } from 'kc-graph';
 ```
 
 | Export | Description |
 |--------|-------------|
-| `toolDefinitions` | MCP tool schemas (search_code, get_context, get_impact, get_structure, find_similar) |
-| `createToolHandlers(graph)` | Create handler functions bound to a graph |
-| `startMcpServer(graph)` | Start stdio MCP server (JSON-RPC over stdin/stdout) |
+| `toolDefinitions` | MCP tool schemas (list_projects, search_code, get_context, get_impact, get_structure, find_similar) |
+| `createToolHandlers(projects)` | Create handler functions bound to a `ProjectMap` |
+| `singleProject(name, graph, path)` | Create a `ProjectMap` with one project |
+| `startMcpServer(projects)` | Start stdio MCP server (JSON-RPC over stdin/stdout) |
+
+All tools accept an optional `project` parameter to scope queries to a specific project when running in multi-project mode.
 
 ## Viewer
 
