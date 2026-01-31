@@ -1,3 +1,7 @@
 #!/bin/sh
 pnpm lint-staged
-pnpm test
+
+# Only run tests if files in src/ have been staged for commit
+if git diff --cached --name-only | grep -q "^src/"; then
+  pnpm test
+fi

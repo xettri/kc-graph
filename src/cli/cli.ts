@@ -1,14 +1,28 @@
 #!/usr/bin/env node
 
-import { resolve, basename } from 'node:path';
-import { existsSync } from 'node:fs';
+import { resolve, basename, dirname, join } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
 import { initProject, syncProject } from './indexer.js';
 import { resolveStore, loadAllGlobalProjects } from '../storage/resolver.js';
 import { startMcpServer } from '../mcp/server.js';
 import { singleProject } from '../mcp/tools.js';
 import { startViewer } from './viewer.js';
 
-const VERSION = '0.1.0';
+function getVersion(): string {
+  let curr = typeof __dirname !== 'undefined' ? __dirname : process.cwd();
+
+  while (curr !== '/' && curr !== '') {
+    const pkgPath = join(curr, 'package.json');
+    if (existsSync(pkgPath)) {
+      const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+      if (pkg.version) return pkg.version;
+    }
+    curr = dirname(curr);
+  }
+  return 'unknown';
+}
+
+const VERSION = getVersion();
 
 // ---------------------------------------------------------------------------
 // Argument parsing (no deps)
