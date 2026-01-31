@@ -4,11 +4,7 @@ import type { CodeGraph } from '../core/graph.js';
  * Parse a markdown documentation file and add it to the graph.
  * Links doc nodes to code nodes when symbol names are mentioned.
  */
-export function indexDocFile(
-  graph: CodeGraph,
-  filePath: string,
-  content: string,
-): number {
+export function indexDocFile(graph: CodeGraph, filePath: string, content: string): number {
   // Create a doc node for the file
   const docNode = graph.addNode({
     type: 'doc',

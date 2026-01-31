@@ -80,11 +80,7 @@ export function buildContext(
 /**
  * Format nodes into a structured text context for AI consumption.
  */
-function formatContext(
-  nodes: CodeNode[],
-  includeSignatures: boolean,
-  seedIds: string[],
-): string {
+function formatContext(nodes: CodeNode[], includeSignatures: boolean, seedIds: string[]): string {
   const seedSet = new Set(seedIds);
   const sections: string[] = [];
 

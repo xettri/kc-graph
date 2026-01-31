@@ -103,10 +103,7 @@ export function setEmbedding(
  * Batch set embeddings for multiple nodes.
  * Accepts a map of identifier → embedding.
  */
-export function setEmbeddings(
-  graph: CodeGraph,
-  embeddings: Map<string, Float32Array>,
-): number {
+export function setEmbeddings(graph: CodeGraph, embeddings: Map<string, Float32Array>): number {
   let count = 0;
   for (const [identifier, embedding] of embeddings) {
     const node = graph.resolve(identifier);

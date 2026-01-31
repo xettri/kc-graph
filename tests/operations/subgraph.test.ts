@@ -5,12 +5,66 @@ import { extractSubgraph, getFileStructure } from '../../src/operations/subgraph
 function buildGraph(): CodeGraph {
   const g = new CodeGraph();
 
-  g.addNode({ id: 'f1', type: 'file', name: 'app.ts', qualifiedName: 'app.ts', content: '', signature: '', location: { file: 'app.ts', startLine: 1, endLine: 50, startColumn: 0, endColumn: 0 }, metadata: {} });
-  g.addNode({ id: 'f1#A', type: 'class', name: 'A', qualifiedName: 'app.ts#A', content: 'class A {}', signature: 'class A', location: { file: 'app.ts', startLine: 2, endLine: 10, startColumn: 0, endColumn: 1 }, metadata: {} });
-  g.addNode({ id: 'f1#A.run', type: 'function', name: 'run', qualifiedName: 'app.ts#A.run', content: 'run() {}', signature: '() => void', location: { file: 'app.ts', startLine: 3, endLine: 5, startColumn: 2, endColumn: 3 }, metadata: {} });
-  g.addNode({ id: 'f1#helper', type: 'function', name: 'helper', qualifiedName: 'app.ts#helper', content: 'function helper() {}', signature: '() => void', location: { file: 'app.ts', startLine: 12, endLine: 14, startColumn: 0, endColumn: 1 }, metadata: {} });
-  g.addNode({ id: 'f2', type: 'file', name: 'utils.ts', qualifiedName: 'utils.ts', content: '', signature: '', location: { file: 'utils.ts', startLine: 1, endLine: 20, startColumn: 0, endColumn: 0 }, metadata: {} });
-  g.addNode({ id: 'f2#format', type: 'function', name: 'format', qualifiedName: 'utils.ts#format', content: 'function format() {}', signature: '() => string', location: { file: 'utils.ts', startLine: 1, endLine: 3, startColumn: 0, endColumn: 1 }, metadata: {} });
+  g.addNode({
+    id: 'f1',
+    type: 'file',
+    name: 'app.ts',
+    qualifiedName: 'app.ts',
+    content: '',
+    signature: '',
+    location: { file: 'app.ts', startLine: 1, endLine: 50, startColumn: 0, endColumn: 0 },
+    metadata: {},
+  });
+  g.addNode({
+    id: 'f1#A',
+    type: 'class',
+    name: 'A',
+    qualifiedName: 'app.ts#A',
+    content: 'class A {}',
+    signature: 'class A',
+    location: { file: 'app.ts', startLine: 2, endLine: 10, startColumn: 0, endColumn: 1 },
+    metadata: {},
+  });
+  g.addNode({
+    id: 'f1#A.run',
+    type: 'function',
+    name: 'run',
+    qualifiedName: 'app.ts#A.run',
+    content: 'run() {}',
+    signature: '() => void',
+    location: { file: 'app.ts', startLine: 3, endLine: 5, startColumn: 2, endColumn: 3 },
+    metadata: {},
+  });
+  g.addNode({
+    id: 'f1#helper',
+    type: 'function',
+    name: 'helper',
+    qualifiedName: 'app.ts#helper',
+    content: 'function helper() {}',
+    signature: '() => void',
+    location: { file: 'app.ts', startLine: 12, endLine: 14, startColumn: 0, endColumn: 1 },
+    metadata: {},
+  });
+  g.addNode({
+    id: 'f2',
+    type: 'file',
+    name: 'utils.ts',
+    qualifiedName: 'utils.ts',
+    content: '',
+    signature: '',
+    location: { file: 'utils.ts', startLine: 1, endLine: 20, startColumn: 0, endColumn: 0 },
+    metadata: {},
+  });
+  g.addNode({
+    id: 'f2#format',
+    type: 'function',
+    name: 'format',
+    qualifiedName: 'utils.ts#format',
+    content: 'function format() {}',
+    signature: '() => string',
+    location: { file: 'utils.ts', startLine: 1, endLine: 3, startColumn: 0, endColumn: 1 },
+    metadata: {},
+  });
 
   g.addEdge({ source: 'f1', target: 'f1#A', type: 'contains', weight: 1, metadata: {} });
   g.addEdge({ source: 'f1#A', target: 'f1#A.run', type: 'contains', weight: 1, metadata: {} });

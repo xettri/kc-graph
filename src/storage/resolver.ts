@@ -64,10 +64,7 @@ export function createStore(
 // Global registry
 // ---------------------------------------------------------------------------
 
-function getGlobalStore(
-  projectRoot: string,
-  config?: Partial<StorageConfig>,
-): ChunkStore {
+function getGlobalStore(projectRoot: string, config?: Partial<StorageConfig>): ChunkStore {
   ensureGlobalDir();
   const projectId = getProjectId(projectRoot);
   const projectDir = join(GLOBAL_DIR, 'projects', projectId);
@@ -132,7 +129,10 @@ export function listGlobalProjects(): RegistryEntry[] {
   return Object.values(registry.projects);
 }
 
-export function loadAllGlobalProjects(): Map<string, { graph: CodeGraph; store: ChunkStore; path: string }> {
+export function loadAllGlobalProjects(): Map<
+  string,
+  { graph: CodeGraph; store: ChunkStore; path: string }
+> {
   const registry = readRegistry();
   const result = new Map<string, { graph: CodeGraph; store: ChunkStore; path: string }>();
 

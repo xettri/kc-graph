@@ -6,17 +6,95 @@ import type { ProjectMap } from '../../src/mcp/tools.js';
 function buildGraph(): CodeGraph {
   const g = new CodeGraph();
 
-  g.addNode({ id: 'src/app.ts', type: 'file', name: 'app.ts', qualifiedName: 'src/app.ts', content: '', signature: '', location: { file: 'src/app.ts', startLine: 1, endLine: 50, startColumn: 0, endColumn: 0 }, metadata: {} });
-  g.addNode({ id: 'src/app.ts#main', type: 'function', name: 'main', qualifiedName: 'src/app.ts#main', content: 'function main() {}', signature: '() => void', location: { file: 'src/app.ts', startLine: 2, endLine: 5, startColumn: 0, endColumn: 1 }, metadata: {} });
-  g.addNode({ id: 'src/app.ts#helper', type: 'function', name: 'helper', qualifiedName: 'src/app.ts#helper', content: 'function helper() {}', signature: '() => string', location: { file: 'src/app.ts', startLine: 7, endLine: 9, startColumn: 0, endColumn: 1 }, metadata: {} });
-  g.addNode({ id: 'src/app.ts#Config', type: 'type', name: 'Config', qualifiedName: 'src/app.ts#Config', content: 'interface Config {}', signature: 'interface Config', location: { file: 'src/app.ts', startLine: 11, endLine: 13, startColumn: 0, endColumn: 1 }, metadata: {} });
-  g.addNode({ id: 'src/utils.ts', type: 'file', name: 'utils.ts', qualifiedName: 'src/utils.ts', content: '', signature: '', location: { file: 'src/utils.ts', startLine: 1, endLine: 20, startColumn: 0, endColumn: 0 }, metadata: {} });
-  g.addNode({ id: 'src/utils.ts#format', type: 'function', name: 'format', qualifiedName: 'src/utils.ts#format', content: 'function format() {}', signature: '(s: string) => string', location: { file: 'src/utils.ts', startLine: 1, endLine: 3, startColumn: 0, endColumn: 1 }, metadata: {} });
+  g.addNode({
+    id: 'src/app.ts',
+    type: 'file',
+    name: 'app.ts',
+    qualifiedName: 'src/app.ts',
+    content: '',
+    signature: '',
+    location: { file: 'src/app.ts', startLine: 1, endLine: 50, startColumn: 0, endColumn: 0 },
+    metadata: {},
+  });
+  g.addNode({
+    id: 'src/app.ts#main',
+    type: 'function',
+    name: 'main',
+    qualifiedName: 'src/app.ts#main',
+    content: 'function main() {}',
+    signature: '() => void',
+    location: { file: 'src/app.ts', startLine: 2, endLine: 5, startColumn: 0, endColumn: 1 },
+    metadata: {},
+  });
+  g.addNode({
+    id: 'src/app.ts#helper',
+    type: 'function',
+    name: 'helper',
+    qualifiedName: 'src/app.ts#helper',
+    content: 'function helper() {}',
+    signature: '() => string',
+    location: { file: 'src/app.ts', startLine: 7, endLine: 9, startColumn: 0, endColumn: 1 },
+    metadata: {},
+  });
+  g.addNode({
+    id: 'src/app.ts#Config',
+    type: 'type',
+    name: 'Config',
+    qualifiedName: 'src/app.ts#Config',
+    content: 'interface Config {}',
+    signature: 'interface Config',
+    location: { file: 'src/app.ts', startLine: 11, endLine: 13, startColumn: 0, endColumn: 1 },
+    metadata: {},
+  });
+  g.addNode({
+    id: 'src/utils.ts',
+    type: 'file',
+    name: 'utils.ts',
+    qualifiedName: 'src/utils.ts',
+    content: '',
+    signature: '',
+    location: { file: 'src/utils.ts', startLine: 1, endLine: 20, startColumn: 0, endColumn: 0 },
+    metadata: {},
+  });
+  g.addNode({
+    id: 'src/utils.ts#format',
+    type: 'function',
+    name: 'format',
+    qualifiedName: 'src/utils.ts#format',
+    content: 'function format() {}',
+    signature: '(s: string) => string',
+    location: { file: 'src/utils.ts', startLine: 1, endLine: 3, startColumn: 0, endColumn: 1 },
+    metadata: {},
+  });
 
-  g.addEdge({ source: 'src/app.ts', target: 'src/app.ts#main', type: 'contains', weight: 1, metadata: {} });
-  g.addEdge({ source: 'src/app.ts', target: 'src/app.ts#helper', type: 'contains', weight: 1, metadata: {} });
-  g.addEdge({ source: 'src/app.ts#main', target: 'src/app.ts#helper', type: 'calls', weight: 1, metadata: {} });
-  g.addEdge({ source: 'src/app.ts#main', target: 'src/utils.ts#format', type: 'calls', weight: 1, metadata: {} });
+  g.addEdge({
+    source: 'src/app.ts',
+    target: 'src/app.ts#main',
+    type: 'contains',
+    weight: 1,
+    metadata: {},
+  });
+  g.addEdge({
+    source: 'src/app.ts',
+    target: 'src/app.ts#helper',
+    type: 'contains',
+    weight: 1,
+    metadata: {},
+  });
+  g.addEdge({
+    source: 'src/app.ts#main',
+    target: 'src/app.ts#helper',
+    type: 'calls',
+    weight: 1,
+    metadata: {},
+  });
+  g.addEdge({
+    source: 'src/app.ts#main',
+    target: 'src/utils.ts#format',
+    type: 'calls',
+    weight: 1,
+    metadata: {},
+  });
 
   return g;
 }
@@ -24,12 +102,51 @@ function buildGraph(): CodeGraph {
 function buildSecondGraph(): CodeGraph {
   const g = new CodeGraph();
 
-  g.addNode({ id: 'lib/auth.ts', type: 'file', name: 'auth.ts', qualifiedName: 'lib/auth.ts', content: '', signature: '', location: { file: 'lib/auth.ts', startLine: 1, endLine: 30, startColumn: 0, endColumn: 0 }, metadata: {} });
-  g.addNode({ id: 'lib/auth.ts#login', type: 'function', name: 'login', qualifiedName: 'lib/auth.ts#login', content: 'function login() {}', signature: '(user: string) => boolean', location: { file: 'lib/auth.ts', startLine: 2, endLine: 10, startColumn: 0, endColumn: 1 }, metadata: {} });
-  g.addNode({ id: 'lib/auth.ts#logout', type: 'function', name: 'logout', qualifiedName: 'lib/auth.ts#logout', content: 'function logout() {}', signature: '() => void', location: { file: 'lib/auth.ts', startLine: 12, endLine: 15, startColumn: 0, endColumn: 1 }, metadata: {} });
+  g.addNode({
+    id: 'lib/auth.ts',
+    type: 'file',
+    name: 'auth.ts',
+    qualifiedName: 'lib/auth.ts',
+    content: '',
+    signature: '',
+    location: { file: 'lib/auth.ts', startLine: 1, endLine: 30, startColumn: 0, endColumn: 0 },
+    metadata: {},
+  });
+  g.addNode({
+    id: 'lib/auth.ts#login',
+    type: 'function',
+    name: 'login',
+    qualifiedName: 'lib/auth.ts#login',
+    content: 'function login() {}',
+    signature: '(user: string) => boolean',
+    location: { file: 'lib/auth.ts', startLine: 2, endLine: 10, startColumn: 0, endColumn: 1 },
+    metadata: {},
+  });
+  g.addNode({
+    id: 'lib/auth.ts#logout',
+    type: 'function',
+    name: 'logout',
+    qualifiedName: 'lib/auth.ts#logout',
+    content: 'function logout() {}',
+    signature: '() => void',
+    location: { file: 'lib/auth.ts', startLine: 12, endLine: 15, startColumn: 0, endColumn: 1 },
+    metadata: {},
+  });
 
-  g.addEdge({ source: 'lib/auth.ts', target: 'lib/auth.ts#login', type: 'contains', weight: 1, metadata: {} });
-  g.addEdge({ source: 'lib/auth.ts', target: 'lib/auth.ts#logout', type: 'contains', weight: 1, metadata: {} });
+  g.addEdge({
+    source: 'lib/auth.ts',
+    target: 'lib/auth.ts#login',
+    type: 'contains',
+    weight: 1,
+    metadata: {},
+  });
+  g.addEdge({
+    source: 'lib/auth.ts',
+    target: 'lib/auth.ts#logout',
+    type: 'contains',
+    weight: 1,
+    metadata: {},
+  });
 
   return g;
 }

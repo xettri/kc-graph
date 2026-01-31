@@ -34,7 +34,8 @@ export const toolDefinitions = {
 
   search_code: {
     name: 'search_code',
-    description: 'Search for code symbols (functions, classes, variables, types) across all indexed projects',
+    description:
+      'Search for code symbols (functions, classes, variables, types) across all indexed projects',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -53,13 +54,21 @@ export const toolDefinitions = {
 
   get_context: {
     name: 'get_context',
-    description: 'Get token-optimized context for a code symbol or file, including related code and documentation',
+    description:
+      'Get token-optimized context for a code symbol or file, including related code and documentation',
     inputSchema: {
       type: 'object' as const,
       properties: {
         symbol: { type: 'string', description: 'Symbol name to get context for' },
-        file: { type: 'string', description: 'File path (narrows symbol lookup or gets file context)' },
-        maxTokens: { type: 'number', description: 'Maximum token budget (default: 4000)', default: 4000 },
+        file: {
+          type: 'string',
+          description: 'File path (narrows symbol lookup or gets file context)',
+        },
+        maxTokens: {
+          type: 'number',
+          description: 'Maximum token budget (default: 4000)',
+          default: 4000,
+        },
         project: projectParam,
       },
       required: [],
@@ -74,7 +83,11 @@ export const toolDefinitions = {
       properties: {
         symbol: { type: 'string', description: 'Symbol name to analyze' },
         file: { type: 'string', description: 'File path to narrow symbol lookup' },
-        maxDepth: { type: 'number', description: 'Maximum analysis depth (default: 5)', default: 5 },
+        maxDepth: {
+          type: 'number',
+          description: 'Maximum analysis depth (default: 5)',
+          default: 5,
+        },
         project: projectParam,
       },
       required: ['symbol'],
@@ -83,7 +96,8 @@ export const toolDefinitions = {
 
   get_structure: {
     name: 'get_structure',
-    description: 'Get the structure of a file or module — its classes, functions, variables, and exports',
+    description:
+      'Get the structure of a file or module — its classes, functions, variables, and exports',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -115,7 +129,9 @@ export interface ToolResult {
   isError?: boolean;
 }
 
-export function createToolHandlers(projects: ProjectMap): Record<string, (args: Record<string, unknown>) => ToolResult> {
+export function createToolHandlers(
+  projects: ProjectMap,
+): Record<string, (args: Record<string, unknown>) => ToolResult> {
   return {
     list_projects: () => handleListProjects(projects),
     search_code: (args) => handleSearchCode(projects, args),
@@ -145,7 +161,7 @@ function handleListProjects(projects: ProjectMap): ToolResult {
     path: entry.path,
     nodes: entry.graph.nodeCount,
     edges: entry.graph.edgeCount,
-    files: new Set([...entry.graph.allNodes()].map(n => n.location?.file).filter(Boolean)).size,
+    files: new Set([...entry.graph.allNodes()].map((n) => n.location?.file).filter(Boolean)).size,
   }));
 
   return {
@@ -161,7 +177,10 @@ function handleSearchCode(projects: ProjectMap, args: Record<string, unknown>): 
 
   const targets = resolveProjects(projects, projectFilter);
   if (targets.length === 0) {
-    return { content: [{ type: 'text', text: `Project not found: ${projectFilter}` }], isError: true };
+    return {
+      content: [{ type: 'text', text: `Project not found: ${projectFilter}` }],
+      isError: true,
+    };
   }
 
   const multiProject = projects.size > 1 && !projectFilter;
@@ -204,7 +223,10 @@ function handleGetContext(projects: ProjectMap, args: Record<string, unknown>): 
 
   const targets = resolveProjects(projects, projectFilter);
   if (targets.length === 0) {
-    return { content: [{ type: 'text', text: `Project not found: ${projectFilter}` }], isError: true };
+    return {
+      content: [{ type: 'text', text: `Project not found: ${projectFilter}` }],
+      isError: true,
+    };
   }
 
   const options: ContextOptions & { file?: string } = { maxTokens, file };
@@ -245,7 +267,10 @@ function handleGetImpact(projects: ProjectMap, args: Record<string, unknown>): T
 
   const targets = resolveProjects(projects, projectFilter);
   if (targets.length === 0) {
-    return { content: [{ type: 'text', text: `Project not found: ${projectFilter}` }], isError: true };
+    return {
+      content: [{ type: 'text', text: `Project not found: ${projectFilter}` }],
+      isError: true,
+    };
   }
 
   const multiProject = projects.size > 1 && !projectFilter;
@@ -275,7 +300,10 @@ function handleGetStructure(projects: ProjectMap, args: Record<string, unknown>)
 
   const targets = resolveProjects(projects, projectFilter);
   if (targets.length === 0) {
-    return { content: [{ type: 'text', text: `Project not found: ${projectFilter}` }], isError: true };
+    return {
+      content: [{ type: 'text', text: `Project not found: ${projectFilter}` }],
+      isError: true,
+    };
   }
 
   const multiProject = projects.size > 1 && !projectFilter;
@@ -287,13 +315,11 @@ function handleGetStructure(projects: ProjectMap, args: Record<string, unknown>)
     const structure: Array<Record<string, unknown>> = [];
     for (const node of fileNodes) {
       if (node.type === 'file') continue;
-      const children = entry.graph
-        .getSuccessors(node.id, ['contains'])
-        .map((child) => ({
-          name: child.name,
-          type: child.type,
-          signature: child.signature || null,
-        }));
+      const children = entry.graph.getSuccessors(node.id, ['contains']).map((child) => ({
+        name: child.name,
+        type: child.type,
+        signature: child.signature || null,
+      }));
       structure.push({
         ...(multiProject ? { project: name } : {}),
         name: node.name,
@@ -325,7 +351,10 @@ function handleFindSimilar(projects: ProjectMap, args: Record<string, unknown>):
 
   const targets = resolveProjects(projects, projectFilter);
   if (targets.length === 0) {
-    return { content: [{ type: 'text', text: `Project not found: ${projectFilter}` }], isError: true };
+    return {
+      content: [{ type: 'text', text: `Project not found: ${projectFilter}` }],
+      isError: true,
+    };
   }
 
   const multiProject = projects.size > 1 && !projectFilter;

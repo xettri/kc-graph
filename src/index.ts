@@ -42,12 +42,28 @@ export { indexDocFile } from './parser/doc-parser.js';
 export type { ParseResult, ParsedNodeInfo, ParsedEdgeInfo, ParserOptions } from './parser/types.js';
 
 // Serialization
-export { exportToJSON, importFromJSON, toJSONString, fromJSONString } from './serialization/json.js';
-export { saveToFile, loadFromFile, saveCompressed, loadCompressed } from './serialization/snapshot.js';
+export {
+  exportToJSON,
+  importFromJSON,
+  toJSONString,
+  fromJSONString,
+} from './serialization/json.js';
+export {
+  saveToFile,
+  loadFromFile,
+  saveCompressed,
+  loadCompressed,
+} from './serialization/snapshot.js';
 
 // Storage (chunked persistence)
 export { ChunkStore } from './storage/chunk-store.js';
-export { resolveStore, createStore, listGlobalProjects, loadAllGlobalProjects, getGlobalStoragePath } from './storage/resolver.js';
+export {
+  resolveStore,
+  createStore,
+  listGlobalProjects,
+  loadAllGlobalProjects,
+  getGlobalStoragePath,
+} from './storage/resolver.js';
 export { initProject, syncProject } from './storage/indexer.js';
 export type { IndexOptions } from './storage/indexer.js';
 export type {

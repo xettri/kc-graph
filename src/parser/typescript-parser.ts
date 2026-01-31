@@ -39,7 +39,9 @@ export function parseTypeScriptSource(
     endLine: lineCount,
     startColumn: 0,
     endColumn: 0,
-    metadata: { language: filePath.endsWith('.ts') || filePath.endsWith('.tsx') ? 'typescript' : 'javascript' },
+    metadata: {
+      language: filePath.endsWith('.ts') || filePath.endsWith('.tsx') ? 'typescript' : 'javascript',
+    },
   });
 
   // Phase 1: Walk top-level declarations
@@ -55,10 +57,12 @@ export function parseTypeScriptSource(
   // -----------------------------------------------------------------------
 
   function visitTopLevel(node: import('typescript').Node) {
-    const { line: startLine, character: startCol } =
-      sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
-    const { line: endLine, character: endCol } =
-      sourceFile.getLineAndCharacterOfPosition(node.getEnd());
+    const { line: startLine, character: startCol } = sourceFile.getLineAndCharacterOfPosition(
+      node.getStart(sourceFile),
+    );
+    const { line: endLine, character: endCol } = sourceFile.getLineAndCharacterOfPosition(
+      node.getEnd(),
+    );
 
     // Function declarations
     if (ts.isFunctionDeclaration(node) && node.name) {
@@ -79,17 +83,17 @@ export function parseTypeScriptSource(
         const qualifiedName = `${filePath}#${name}`;
         const isConst = (node.declarationList.flags & ts.NodeFlags.Const) !== 0;
 
-        const { line: vStartLine, character: vStartCol } =
-          sourceFile.getLineAndCharacterOfPosition(decl.getStart(sourceFile));
-        const { line: vEndLine, character: vEndCol } =
-          sourceFile.getLineAndCharacterOfPosition(decl.getEnd());
+        const { line: vStartLine, character: vStartCol } = sourceFile.getLineAndCharacterOfPosition(
+          decl.getStart(sourceFile),
+        );
+        const { line: vEndLine, character: vEndCol } = sourceFile.getLineAndCharacterOfPosition(
+          decl.getEnd(),
+        );
 
         // Check if initializer is an arrow function or function expression
         if (decl.initializer && isArrowOrFunctionExpr(decl.initializer)) {
           const sig = getArrowSignature(name, decl.initializer, sourceFile, ts);
-          const content = includeBody
-            ? truncate(decl.getText(sourceFile), maxContentLength)
-            : sig;
+          const content = includeBody ? truncate(decl.getText(sourceFile), maxContentLength) : sig;
           const jsdoc = includeJSDoc ? getJSDoc(node, sourceFile) : '';
 
           nodes.push({
@@ -167,9 +171,7 @@ export function parseTypeScriptSource(
         name,
         qualifiedName,
         content,
-        signature: ts.isInterfaceDeclaration(node)
-          ? `interface ${name}`
-          : `type ${name}`,
+        signature: ts.isInterfaceDeclaration(node) ? `interface ${name}` : `type ${name}`,
         startLine: startLine + 1,
         endLine: endLine + 1,
         startColumn: startCol,
@@ -320,8 +322,7 @@ export function parseTypeScriptSource(
     // Heritage clauses
     if (node.heritageClauses) {
       for (const clause of node.heritageClauses) {
-        const clauseType =
-          clause.token === ts.SyntaxKind.ExtendsKeyword ? 'extends' : 'implements';
+        const clauseType = clause.token === ts.SyntaxKind.ExtendsKeyword ? 'extends' : 'implements';
         for (const typeNode of clause.types) {
           const baseTypeName = typeNode.expression.getText(sourceFile);
           edges.push({
@@ -343,10 +344,12 @@ export function parseTypeScriptSource(
           ? truncate(member.getText(sourceFile), maxContentLength)
           : methodSig;
 
-        const { line: mStartLine, character: mStartCol } =
-          sourceFile.getLineAndCharacterOfPosition(member.getStart(sourceFile));
-        const { line: mEndLine, character: mEndCol } =
-          sourceFile.getLineAndCharacterOfPosition(member.getEnd());
+        const { line: mStartLine, character: mStartCol } = sourceFile.getLineAndCharacterOfPosition(
+          member.getStart(sourceFile),
+        );
+        const { line: mEndLine, character: mEndCol } = sourceFile.getLineAndCharacterOfPosition(
+          member.getEnd(),
+        );
 
         nodes.push({
           type: 'function',
@@ -373,15 +376,17 @@ export function parseTypeScriptSource(
       // Constructor
       if (ts.isConstructorDeclaration(member)) {
         const ctorQN = `${qualifiedName}.constructor`;
-        const ctorSig = `constructor(${member.parameters.map(p => p.getText(sourceFile)).join(', ')})`;
+        const ctorSig = `constructor(${member.parameters.map((p) => p.getText(sourceFile)).join(', ')})`;
         const ctorContent = includeBody
           ? truncate(member.getText(sourceFile), maxContentLength)
           : ctorSig;
 
-        const { line: cStartLine, character: cStartCol } =
-          sourceFile.getLineAndCharacterOfPosition(member.getStart(sourceFile));
-        const { line: cEndLine, character: cEndCol } =
-          sourceFile.getLineAndCharacterOfPosition(member.getEnd());
+        const { line: cStartLine, character: cStartCol } = sourceFile.getLineAndCharacterOfPosition(
+          member.getStart(sourceFile),
+        );
+        const { line: cEndLine, character: cEndCol } = sourceFile.getLineAndCharacterOfPosition(
+          member.getEnd(),
+        );
 
         nodes.push({
           type: 'function',
@@ -414,16 +419,15 @@ export function parseTypeScriptSource(
 
           const { line: pStartLine, character: pStartCol } =
             sourceFile.getLineAndCharacterOfPosition(member.getStart(sourceFile));
-          const { line: pEndLine, character: pEndCol } =
-            sourceFile.getLineAndCharacterOfPosition(member.getEnd());
+          const { line: pEndLine, character: pEndCol } = sourceFile.getLineAndCharacterOfPosition(
+            member.getEnd(),
+          );
 
           nodes.push({
             type: 'function',
             name: propName,
             qualifiedName: propQN,
-            content: includeBody
-              ? truncate(member.getText(sourceFile), maxContentLength)
-              : sig,
+            content: includeBody ? truncate(member.getText(sourceFile), maxContentLength) : sig,
             signature: sig,
             startLine: pStartLine + 1,
             endLine: pEndLine + 1,
@@ -459,9 +463,7 @@ export function parseTypeScriptSource(
   ) {
     const qualifiedName = `${file}#${name}`;
     const sig = getFunctionSignature(node, sourceFile, ts);
-    const content = includeBody
-      ? truncate(node.getText(sourceFile), maxContentLength)
-      : sig;
+    const content = includeBody ? truncate(node.getText(sourceFile), maxContentLength) : sig;
     const jsdoc = includeJSDoc ? getJSDoc(node, sourceFile) : '';
 
     nodes.push({
@@ -513,7 +515,11 @@ export function parseTypeScriptSource(
           extractCallsFromBody(member, `${currentContainer}.${methodName}`);
         } else if (ts.isConstructorDeclaration(member)) {
           extractCallsFromBody(member, `${currentContainer}.constructor`);
-        } else if (ts.isPropertyDeclaration(member) && member.initializer && isArrowOrFunctionExpr(member.initializer)) {
+        } else if (
+          ts.isPropertyDeclaration(member) &&
+          member.initializer &&
+          isArrowOrFunctionExpr(member.initializer)
+        ) {
           const propName = member.name?.getText(sourceFile);
           if (propName) extractCallsFromBody(member.initializer, `${currentContainer}.${propName}`);
         }
@@ -688,9 +694,7 @@ function getFunctionSignature(
   ts: typeof import('typescript'),
 ): string {
   const name = node.name?.getText(sourceFile) ?? 'anonymous';
-  const params = node.parameters
-    .map((p) => p.getText(sourceFile))
-    .join(', ');
+  const params = node.parameters.map((p) => p.getText(sourceFile)).join(', ');
   const returnType = node.type ? `: ${node.type.getText(sourceFile)}` : '';
   const isAsync = node.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword);
   return `${isAsync ? 'async ' : ''}function ${name}(${params})${returnType}`;
@@ -707,7 +711,9 @@ function getArrowSignature(
       .map((p: import('typescript').ParameterDeclaration) => p.getText(sourceFile))
       .join(', ');
     const returnType = node.type ? `: ${node.type.getText(sourceFile)}` : '';
-    const isAsync = node.modifiers?.some((m: import('typescript').ModifierLike) => m.kind === ts.SyntaxKind.AsyncKeyword);
+    const isAsync = node.modifiers?.some(
+      (m: import('typescript').ModifierLike) => m.kind === ts.SyntaxKind.AsyncKeyword,
+    );
     return `${isAsync ? 'async ' : ''}const ${name} = (${params})${returnType}`;
   }
   return `const ${name}`;
@@ -728,7 +734,9 @@ function hasExportModifier(
   node: import('typescript').Node,
   ts: typeof import('typescript'),
 ): boolean {
-  const modifiers = (node as { modifiers?: import('typescript').NodeArray<import('typescript').ModifierLike> }).modifiers;
+  const modifiers = (
+    node as { modifiers?: import('typescript').NodeArray<import('typescript').ModifierLike> }
+  ).modifiers;
   if (!modifiers) return false;
   return modifiers.some(
     (m) => (m as import('typescript').Modifier).kind === ts.SyntaxKind.ExportKeyword,

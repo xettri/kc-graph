@@ -282,11 +282,7 @@ export class ChunkStore {
    * Split nodes into chunks respecting size threshold.
    * Returns array of chunk IDs written.
    */
-  private writeNodesSplit(
-    nodes: CodeNode[],
-    edges: CodeEdge[],
-    map: StorageMap,
-  ): string[] {
+  private writeNodesSplit(nodes: CodeNode[], edges: CodeEdge[], map: StorageMap): string[] {
     const chunkIds: string[] = [];
 
     // Build edge index: source node → edges
@@ -538,11 +534,7 @@ function groupByTopLevel(nodes: CodeNode[]): SymbolGroup[] {
   return groups;
 }
 
-function buildChunkData(
-  id: string,
-  nodes: CodeNode[],
-  edges: CodeEdge[],
-): ChunkData {
+function buildChunkData(id: string, nodes: CodeNode[], edges: CodeEdge[]): ChunkData {
   return {
     id,
     nodes: nodes.map(serializeNode),

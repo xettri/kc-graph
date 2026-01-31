@@ -11,9 +11,33 @@ import { toolDefinitions, createToolHandlers, singleProject } from '../../src/mc
 
 function buildGraph(): CodeGraph {
   const g = new CodeGraph();
-  g.addNode({ id: 'src/app.ts', type: 'file', name: 'app.ts', qualifiedName: 'src/app.ts', content: '', signature: '', location: { file: 'src/app.ts', startLine: 1, endLine: 1, startColumn: 0, endColumn: 0 }, metadata: {} });
-  g.addNode({ id: 'src/app.ts#main', type: 'function', name: 'main', qualifiedName: 'src/app.ts#main', content: 'function main() {}', signature: '() => void', location: { file: 'src/app.ts', startLine: 1, endLine: 1, startColumn: 0, endColumn: 18 }, metadata: {} });
-  g.addEdge({ source: 'src/app.ts', target: 'src/app.ts#main', type: 'contains', weight: 1, metadata: {} });
+  g.addNode({
+    id: 'src/app.ts',
+    type: 'file',
+    name: 'app.ts',
+    qualifiedName: 'src/app.ts',
+    content: '',
+    signature: '',
+    location: { file: 'src/app.ts', startLine: 1, endLine: 1, startColumn: 0, endColumn: 0 },
+    metadata: {},
+  });
+  g.addNode({
+    id: 'src/app.ts#main',
+    type: 'function',
+    name: 'main',
+    qualifiedName: 'src/app.ts#main',
+    content: 'function main() {}',
+    signature: '() => void',
+    location: { file: 'src/app.ts', startLine: 1, endLine: 1, startColumn: 0, endColumn: 18 },
+    metadata: {},
+  });
+  g.addEdge({
+    source: 'src/app.ts',
+    target: 'src/app.ts#main',
+    type: 'contains',
+    weight: 1,
+    metadata: {},
+  });
   return g;
 }
 
@@ -86,7 +110,9 @@ describe('MCP Server Protocol', () => {
 
   it('should respond to initialize with server info', () => {
     const resp = handleMcpMessage(graph, {
-      jsonrpc: '2.0', id: 1, method: 'initialize',
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
       params: { protocolVersion: '2024-11-05', capabilities: {} },
     }) as any;
 
@@ -98,7 +124,9 @@ describe('MCP Server Protocol', () => {
 
   it('should list all 6 tools', () => {
     const resp = handleMcpMessage(graph, {
-      jsonrpc: '2.0', id: 2, method: 'tools/list',
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'tools/list',
     }) as any;
 
     expect(resp.result.tools.length).toBe(6);
@@ -113,7 +141,9 @@ describe('MCP Server Protocol', () => {
 
   it('should have valid input schemas for each tool', () => {
     const resp = handleMcpMessage(graph, {
-      jsonrpc: '2.0', id: 3, method: 'tools/list',
+      jsonrpc: '2.0',
+      id: 3,
+      method: 'tools/list',
     }) as any;
 
     for (const tool of resp.result.tools) {
@@ -125,7 +155,9 @@ describe('MCP Server Protocol', () => {
 
   it('should handle search_code tool call', () => {
     const resp = handleMcpMessage(graph, {
-      jsonrpc: '2.0', id: 4, method: 'tools/call',
+      jsonrpc: '2.0',
+      id: 4,
+      method: 'tools/call',
       params: { name: 'search_code', arguments: { query: 'main' } },
     }) as any;
 
@@ -136,7 +168,9 @@ describe('MCP Server Protocol', () => {
 
   it('should handle get_structure tool call', () => {
     const resp = handleMcpMessage(graph, {
-      jsonrpc: '2.0', id: 5, method: 'tools/call',
+      jsonrpc: '2.0',
+      id: 5,
+      method: 'tools/call',
       params: { name: 'get_structure', arguments: { path: 'src/app.ts' } },
     }) as any;
 
@@ -147,7 +181,9 @@ describe('MCP Server Protocol', () => {
 
   it('should handle get_context tool call', () => {
     const resp = handleMcpMessage(graph, {
-      jsonrpc: '2.0', id: 6, method: 'tools/call',
+      jsonrpc: '2.0',
+      id: 6,
+      method: 'tools/call',
       params: { name: 'get_context', arguments: { symbol: 'main' } },
     }) as any;
 
@@ -157,7 +193,9 @@ describe('MCP Server Protocol', () => {
 
   it('should handle get_impact tool call', () => {
     const resp = handleMcpMessage(graph, {
-      jsonrpc: '2.0', id: 7, method: 'tools/call',
+      jsonrpc: '2.0',
+      id: 7,
+      method: 'tools/call',
       params: { name: 'get_impact', arguments: { symbol: 'main' } },
     }) as any;
 
@@ -166,7 +204,9 @@ describe('MCP Server Protocol', () => {
 
   it('should return error for unknown tool', () => {
     const resp = handleMcpMessage(graph, {
-      jsonrpc: '2.0', id: 8, method: 'tools/call',
+      jsonrpc: '2.0',
+      id: 8,
+      method: 'tools/call',
       params: { name: 'nonexistent_tool', arguments: {} },
     }) as any;
 
@@ -175,7 +215,9 @@ describe('MCP Server Protocol', () => {
 
   it('should respond to ping', () => {
     const resp = handleMcpMessage(graph, {
-      jsonrpc: '2.0', id: 9, method: 'ping',
+      jsonrpc: '2.0',
+      id: 9,
+      method: 'ping',
     }) as any;
 
     expect(resp.id).toBe(9);
@@ -184,7 +226,9 @@ describe('MCP Server Protocol', () => {
 
   it('should return null for unknown methods', () => {
     const resp = handleMcpMessage(graph, {
-      jsonrpc: '2.0', id: 10, method: 'unknown/method',
+      jsonrpc: '2.0',
+      id: 10,
+      method: 'unknown/method',
     });
 
     expect(resp).toBeNull();

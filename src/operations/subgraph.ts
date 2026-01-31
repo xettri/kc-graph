@@ -78,10 +78,7 @@ export function extractSubgraph(
 /**
  * Get the containment tree for a file (file → classes/functions → methods/variables).
  */
-export function getFileStructure(
-  graph: CodeGraph,
-  filePath: string,
-): Map<string, CodeNode[]> {
+export function getFileStructure(graph: CodeGraph, filePath: string): Map<string, CodeNode[]> {
   const structure = new Map<string, CodeNode[]>();
   const fileNodes = graph.findByFile(filePath);
 

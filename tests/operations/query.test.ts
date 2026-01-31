@@ -43,7 +43,11 @@ describe('GraphQuery', () => {
       location: { file: 'src/config.ts', startLine: 1, endLine: 1, startColumn: 0, endColumn: 0 },
     });
 
-    graph.addEdge({ source: 'src/auth.ts#handleLogin', target: 'src/user.ts#UserService', type: 'calls' });
+    graph.addEdge({
+      source: 'src/auth.ts#handleLogin',
+      target: 'src/user.ts#UserService',
+      type: 'calls',
+    });
   });
 
   it('should filter by type', () => {
@@ -68,7 +72,9 @@ describe('GraphQuery', () => {
   });
 
   it('should filter by name regex', () => {
-    const results = query(graph).withName(/^handle/).results();
+    const results = query(graph)
+      .withName(/^handle/)
+      .results();
     expect(results.length).toBe(2);
   });
 
@@ -84,7 +90,11 @@ describe('GraphQuery', () => {
   });
 
   it('should chain multiple filters', () => {
-    const results = query(graph).ofType('function').inFile('src/auth.ts').withName(/login/i).results();
+    const results = query(graph)
+      .ofType('function')
+      .inFile('src/auth.ts')
+      .withName(/login/i)
+      .results();
     expect(results.length).toBe(1);
     expect(results[0]!.name).toBe('handleLogin');
   });

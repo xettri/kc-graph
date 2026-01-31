@@ -133,7 +133,12 @@ describe('CodeGraph', () => {
 
       expect(graph.getSuccessors(a.id).map((n) => n.name)).toEqual(['b', 'c']);
       expect(graph.getPredecessors(b.id).map((n) => n.name)).toEqual(['a']);
-      expect(graph.getNeighbors(b.id).map((n) => n.name).sort()).toEqual(['a']);
+      expect(
+        graph
+          .getNeighbors(b.id)
+          .map((n) => n.name)
+          .sort(),
+      ).toEqual(['a']);
     });
 
     it('should filter edges by type', () => {

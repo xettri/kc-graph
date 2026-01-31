@@ -323,9 +323,7 @@ class Service {
       const ctor = graph.resolve('src/service.ts#Service.constructor');
       const init = graph.resolve('src/service.ts#Service.init');
       if (ctor && init) {
-        const ctorCallsInit = edges.some(
-          (e) => e.source === ctor.id && e.target === init.id,
-        );
+        const ctorCallsInit = edges.some((e) => e.source === ctor.id && e.target === init.id);
         expect(ctorCallsInit).toBe(true);
       }
     });
@@ -358,7 +356,9 @@ class Service {
       const result = parseTypeScriptSource('src/io.ts', source);
       const imports = result.edges.filter((e) => e.type === 'imports');
       expect(imports.some((e) => e.targetQualifiedName === 'node:fs/promises#readFile')).toBe(true);
-      expect(imports.some((e) => e.targetQualifiedName === 'node:fs/promises#writeFile')).toBe(true);
+      expect(imports.some((e) => e.targetQualifiedName === 'node:fs/promises#writeFile')).toBe(
+        true,
+      );
     });
   });
 

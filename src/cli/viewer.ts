@@ -88,12 +88,17 @@ function getCytoscapeScript(): string {
     try {
       const src = readFileSync(p, 'utf-8');
       return `<script>${src}<\/script>`;
-    } catch { /* continue */ }
+    } catch {
+      /* continue */
+    }
   }
   return `<script src="https://cdn.jsdelivr.net/npm/cytoscape@3.31.0/dist/cytoscape.min.js"><\/script>`;
 }
 
-function buildHTML(graphJSON: string, stats: { nodes: number; edges: number; files: number }): string {
+function buildHTML(
+  graphJSON: string,
+  stats: { nodes: number; edges: number; files: number },
+): string {
   const cytoscapeScript = getCytoscapeScript();
   return `<!DOCTYPE html>
 <html lang="en">
@@ -539,8 +544,10 @@ export function startViewer(graph: CodeGraph, options: ViewerOptions = {}): void
 function openBrowser(url: string): void {
   const { exec } = require('node:child_process');
   const cmd =
-    process.platform === 'darwin' ? `open "${url}"` :
-    process.platform === 'win32' ? `start "${url}"` :
-    `xdg-open "${url}"`;
+    process.platform === 'darwin'
+      ? `open "${url}"`
+      : process.platform === 'win32'
+        ? `start "${url}"`
+        : `xdg-open "${url}"`;
   exec(cmd, () => {});
 }

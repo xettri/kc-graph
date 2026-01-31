@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { CodeGraph } from '../../src/core/graph.js';
-import { exportToJSON, importFromJSON, toJSONString, fromJSONString } from '../../src/serialization/json.js';
+import {
+  exportToJSON,
+  importFromJSON,
+  toJSONString,
+  fromJSONString,
+} from '../../src/serialization/json.js';
 
 describe('JSON Serialization', () => {
   function buildTestGraph(): CodeGraph {

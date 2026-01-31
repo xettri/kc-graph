@@ -135,7 +135,9 @@ export function analyzeImpact(
 export function formatImpactSummary(result: ImpactResult): string {
   const lines: string[] = [];
   lines.push(`Impact analysis for: ${result.source.name} (${result.source.type})`);
-  lines.push(`Total impacted: ${result.stats.totalImpacted} nodes across ${result.stats.fileCount} files`);
+  lines.push(
+    `Total impacted: ${result.stats.totalImpacted} nodes across ${result.stats.fileCount} files`,
+  );
   lines.push('');
 
   // Group by file

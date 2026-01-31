@@ -16,24 +16,99 @@ function buildTestGraph(): CodeGraph {
   const g = new CodeGraph();
 
   // File node
-  g.addNode({ id: 'src/app.ts', type: 'file', name: 'app.ts', qualifiedName: 'src/app.ts', content: '', signature: '', location: { file: 'src/app.ts', startLine: 1, endLine: 50, startColumn: 0, endColumn: 0 }, metadata: {} });
+  g.addNode({
+    id: 'src/app.ts',
+    type: 'file',
+    name: 'app.ts',
+    qualifiedName: 'src/app.ts',
+    content: '',
+    signature: '',
+    location: { file: 'src/app.ts', startLine: 1, endLine: 50, startColumn: 0, endColumn: 0 },
+    metadata: {},
+  });
 
   // Function nodes
-  g.addNode({ id: 'src/app.ts#main', type: 'function', name: 'main', qualifiedName: 'src/app.ts#main', content: 'function main() { return hello(); }', signature: '() => void', location: { file: 'src/app.ts', startLine: 2, endLine: 5, startColumn: 0, endColumn: 1 }, metadata: {} });
+  g.addNode({
+    id: 'src/app.ts#main',
+    type: 'function',
+    name: 'main',
+    qualifiedName: 'src/app.ts#main',
+    content: 'function main() { return hello(); }',
+    signature: '() => void',
+    location: { file: 'src/app.ts', startLine: 2, endLine: 5, startColumn: 0, endColumn: 1 },
+    metadata: {},
+  });
 
-  g.addNode({ id: 'src/app.ts#hello', type: 'function', name: 'hello', qualifiedName: 'src/app.ts#hello', content: 'function hello() { return "world"; }', signature: '() => string', location: { file: 'src/app.ts', startLine: 7, endLine: 9, startColumn: 0, endColumn: 1 }, metadata: {} });
+  g.addNode({
+    id: 'src/app.ts#hello',
+    type: 'function',
+    name: 'hello',
+    qualifiedName: 'src/app.ts#hello',
+    content: 'function hello() { return "world"; }',
+    signature: '() => string',
+    location: { file: 'src/app.ts', startLine: 7, endLine: 9, startColumn: 0, endColumn: 1 },
+    metadata: {},
+  });
 
   // Second file
-  g.addNode({ id: 'src/utils.ts', type: 'file', name: 'utils.ts', qualifiedName: 'src/utils.ts', content: '', signature: '', location: { file: 'src/utils.ts', startLine: 1, endLine: 20, startColumn: 0, endColumn: 0 }, metadata: {} });
+  g.addNode({
+    id: 'src/utils.ts',
+    type: 'file',
+    name: 'utils.ts',
+    qualifiedName: 'src/utils.ts',
+    content: '',
+    signature: '',
+    location: { file: 'src/utils.ts', startLine: 1, endLine: 20, startColumn: 0, endColumn: 0 },
+    metadata: {},
+  });
 
-  g.addNode({ id: 'src/utils.ts#format', type: 'function', name: 'format', qualifiedName: 'src/utils.ts#format', content: 'function format(s: string) { return s.trim(); }', signature: '(s: string) => string', location: { file: 'src/utils.ts', startLine: 1, endLine: 3, startColumn: 0, endColumn: 1 }, metadata: {} });
+  g.addNode({
+    id: 'src/utils.ts#format',
+    type: 'function',
+    name: 'format',
+    qualifiedName: 'src/utils.ts#format',
+    content: 'function format(s: string) { return s.trim(); }',
+    signature: '(s: string) => string',
+    location: { file: 'src/utils.ts', startLine: 1, endLine: 3, startColumn: 0, endColumn: 1 },
+    metadata: {},
+  });
 
   // Edges
-  g.addEdge({ source: 'src/app.ts', target: 'src/app.ts#main', type: 'contains', weight: 1, metadata: {} });
-  g.addEdge({ source: 'src/app.ts', target: 'src/app.ts#hello', type: 'contains', weight: 1, metadata: {} });
-  g.addEdge({ source: 'src/app.ts#main', target: 'src/app.ts#hello', type: 'calls', weight: 1, metadata: {} });
-  g.addEdge({ source: 'src/utils.ts', target: 'src/utils.ts#format', type: 'contains', weight: 1, metadata: {} });
-  g.addEdge({ source: 'src/app.ts#main', target: 'src/utils.ts#format', type: 'calls', weight: 0.5, metadata: {} });
+  g.addEdge({
+    source: 'src/app.ts',
+    target: 'src/app.ts#main',
+    type: 'contains',
+    weight: 1,
+    metadata: {},
+  });
+  g.addEdge({
+    source: 'src/app.ts',
+    target: 'src/app.ts#hello',
+    type: 'contains',
+    weight: 1,
+    metadata: {},
+  });
+  g.addEdge({
+    source: 'src/app.ts#main',
+    target: 'src/app.ts#hello',
+    type: 'calls',
+    weight: 1,
+    metadata: {},
+  });
+  g.addEdge({
+    source: 'src/utils.ts',
+    target: 'src/utils.ts#format',
+    type: 'contains',
+    weight: 1,
+    metadata: {},
+  });
+  g.addEdge({
+    source: 'src/app.ts#main',
+    target: 'src/utils.ts#format',
+    type: 'calls',
+    weight: 0.5,
+    metadata: {},
+  });
 
   return g;
 }
@@ -131,7 +206,9 @@ describe('ChunkStore', () => {
 
       const loaded = store.loadGraph();
       const edges = [...loaded.allEdges()];
-      const callEdge = edges.find(e => e.source === 'src/app.ts#main' && e.target === 'src/app.ts#hello');
+      const callEdge = edges.find(
+        (e) => e.source === 'src/app.ts#main' && e.target === 'src/app.ts#hello',
+      );
       expect(callEdge).toBeDefined();
       expect(callEdge!.type).toBe('calls');
       expect(callEdge!.weight).toBe(1);
@@ -147,7 +224,7 @@ describe('ChunkStore', () => {
       const chunksDir = join(storagePath, 'chunks');
       const files = readdirSync(chunksDir);
       expect(files.length).toBeGreaterThan(0);
-      expect(files.every(f => f.endsWith('.json'))).toBe(true);
+      expect(files.every((f) => f.endsWith('.json'))).toBe(true);
     });
 
     it('should update meta stats after save', () => {
@@ -252,8 +329,26 @@ describe('ChunkStore', () => {
 
       // Modify the graph (simulate re-parse)
       graph.removeFile('src/app.ts');
-      graph.addNode({ id: 'src/app.ts', type: 'file', name: 'app.ts', qualifiedName: 'src/app.ts', content: '', signature: '', location: { file: 'src/app.ts', startLine: 1, endLine: 100, startColumn: 0, endColumn: 0 }, metadata: {} });
-      graph.addNode({ id: 'src/app.ts#main', type: 'function', name: 'main', qualifiedName: 'src/app.ts#main', content: 'function main() { /* updated */ }', signature: '() => void', location: { file: 'src/app.ts', startLine: 2, endLine: 5, startColumn: 0, endColumn: 1 }, metadata: {} });
+      graph.addNode({
+        id: 'src/app.ts',
+        type: 'file',
+        name: 'app.ts',
+        qualifiedName: 'src/app.ts',
+        content: '',
+        signature: '',
+        location: { file: 'src/app.ts', startLine: 1, endLine: 100, startColumn: 0, endColumn: 0 },
+        metadata: {},
+      });
+      graph.addNode({
+        id: 'src/app.ts#main',
+        type: 'function',
+        name: 'main',
+        qualifiedName: 'src/app.ts#main',
+        content: 'function main() { /* updated */ }',
+        signature: '() => void',
+        location: { file: 'src/app.ts', startLine: 2, endLine: 5, startColumn: 0, endColumn: 1 },
+        metadata: {},
+      });
 
       const result = store.syncFiles(graph, ['src/app.ts'], [], projectDir);
       expect(result.chunksWritten).toBeGreaterThan(0);

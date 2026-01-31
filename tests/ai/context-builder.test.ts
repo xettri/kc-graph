@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { CodeGraph } from '../../src/core/graph.js';
-import { buildContext, getContextForSymbol, getContextForFile } from '../../src/ai/context-builder.js';
+import {
+  buildContext,
+  getContextForSymbol,
+  getContextForFile,
+} from '../../src/ai/context-builder.js';
 
 describe('Context Builder', () => {
   let graph: CodeGraph;
@@ -20,7 +24,8 @@ describe('Context Builder', () => {
       type: 'function',
       name: 'login',
       qualifiedName: 'src/auth.ts#login',
-      content: 'async function login(user: string, pass: string): Promise<Token> {\n  const valid = validate(user, pass);\n  return generateToken(user);\n}',
+      content:
+        'async function login(user: string, pass: string): Promise<Token> {\n  const valid = validate(user, pass);\n  return generateToken(user);\n}',
       signature: 'async function login(user: string, pass: string): Promise<Token>',
       location: { file: 'src/auth.ts', startLine: 5, endLine: 8, startColumn: 0, endColumn: 0 },
     });
@@ -55,7 +60,11 @@ describe('Context Builder', () => {
     graph.addEdge({ source: 'src/auth.ts', target: 'src/auth.ts#validate', type: 'contains' });
     graph.addEdge({ source: 'src/auth.ts', target: 'src/auth.ts#generateToken', type: 'contains' });
     graph.addEdge({ source: 'src/auth.ts#login', target: 'src/auth.ts#validate', type: 'calls' });
-    graph.addEdge({ source: 'src/auth.ts#login', target: 'src/auth.ts#generateToken', type: 'calls' });
+    graph.addEdge({
+      source: 'src/auth.ts#login',
+      target: 'src/auth.ts#generateToken',
+      type: 'calls',
+    });
   });
 
   describe('buildContext', () => {

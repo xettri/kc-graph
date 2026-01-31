@@ -98,9 +98,7 @@ export async function syncProject(options: IndexOptions = {}): Promise<SyncResul
   const store = resolveStore(root, { global: options.global, config: options.config });
 
   if (!store.exists()) {
-    throw new Error(
-      `No existing storage found. Run "kc-graph init" first.`,
-    );
+    throw new Error(`No existing storage found. Run "kc-graph init" first.`);
   }
 
   const map = store.readMap();
