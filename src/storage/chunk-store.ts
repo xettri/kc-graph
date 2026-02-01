@@ -88,14 +88,16 @@ export class ChunkStore {
   loadGraph(): CodeGraph {
     const map = this.readMap();
     const graph = new CodeGraph();
+    const chunkIds = Object.keys(map.chunks);
 
-    // Phase 1: load all nodes from all chunks
+    // Phase 1: load all nodes; collect edges via push loop (avoids spread O(n) copy)
     const allEdges: SerializedChunkEdge[] = [];
 
-    for (const chunkId of Object.keys(map.chunks)) {
-      const chunk = this.readChunk(chunkId);
+    for (let ci = 0; ci < chunkIds.length; ci++) {
+      const chunk = this.readChunk(chunkIds[ci]!);
 
-      for (const sn of chunk.nodes) {
+      for (let i = 0; i < chunk.nodes.length; i++) {
+        const sn = chunk.nodes[i]!;
         graph.addNode({
           id: sn.id,
           type: sn.type as NodeType,
@@ -109,24 +111,26 @@ export class ChunkStore {
         });
       }
 
-      allEdges.push(...chunk.edges);
+      // Push loop: O(m) vs spread which copies the entire allEdges array
+      const edges = chunk.edges;
+      for (let i = 0; i < edges.length; i++) {
+        allEdges.push(edges[i]!);
+      }
     }
 
     // Phase 2: add all edges (nodes must exist first)
-    for (const se of allEdges) {
-      if (graph.hasNode(se.source) && graph.hasNode(se.target)) {
-        try {
-          graph.addEdge({
-            id: se.id,
-            source: se.source,
-            target: se.target,
-            type: se.type as EdgeType,
-            weight: se.weight,
-            metadata: se.metadata,
-          });
-        } catch {
-          // skip duplicate edges
-        }
+    // Use hasEdge() guard instead of try/catch — exception handling deoptimizes V8
+    for (let i = 0; i < allEdges.length; i++) {
+      const se = allEdges[i]!;
+      if (graph.hasNode(se.source) && graph.hasNode(se.target) && !graph.hasEdge(se.id)) {
+        graph.addEdge({
+          id: se.id,
+          source: se.source,
+          target: se.target,
+          type: se.type as EdgeType,
+          weight: se.weight,
+          metadata: se.metadata,
+        });
       }
     }
 
@@ -214,10 +218,12 @@ export class ChunkStore {
 
       for (const file of files) {
         const nodes = nodesByFile.get(file) ?? [];
-        groupNodes.push(...nodes);
-        for (const node of nodes) {
-          const edges = edgesBySource.get(node.id);
-          if (edges) groupEdges.push(...edges);
+        for (let i = 0; i < nodes.length; i++) {
+          groupNodes.push(nodes[i]!);
+          const edges = edgesBySource.get(nodes[i]!.id);
+          if (edges) {
+            for (let j = 0; j < edges.length; j++) groupEdges.push(edges[j]!);
+          }
         }
       }
 
@@ -244,9 +250,11 @@ export class ChunkStore {
         for (const file of files) {
           const fileNodes = nodesByFile.get(file) ?? [];
           const fileEdges: CodeEdge[] = [];
-          for (const node of fileNodes) {
-            const edges = edgesBySource.get(node.id);
-            if (edges) fileEdges.push(...edges);
+          for (let ni = 0; ni < fileNodes.length; ni++) {
+            const edges = edgesBySource.get(fileNodes[ni]!.id);
+            if (edges) {
+              for (let ei = 0; ei < edges.length; ei++) fileEdges.push(edges[ei]!);
+            }
           }
 
           const fileChunkIds = this.writeNodesSplit(fileNodes, fileEdges, map);
@@ -316,9 +324,11 @@ export class ChunkStore {
 
     for (const group of groups) {
       const groupEdges: CodeEdge[] = [];
-      for (const node of group.nodes) {
-        const nodeEdges = edgesByNode.get(node.id);
-        if (nodeEdges) groupEdges.push(...nodeEdges);
+      for (let i = 0; i < group.nodes.length; i++) {
+        const nodeEdges = edgesByNode.get(group.nodes[i]!.id);
+        if (nodeEdges) {
+          for (let j = 0; j < nodeEdges.length; j++) groupEdges.push(nodeEdges[j]!);
+        }
       }
       const groupSize = estimateSize(group.nodes, groupEdges);
 
@@ -327,8 +337,8 @@ export class ChunkStore {
         flush();
       }
 
-      currentNodes.push(...group.nodes);
-      currentEdges.push(...groupEdges);
+      for (let i = 0; i < group.nodes.length; i++) currentNodes.push(group.nodes[i]!);
+      for (let i = 0; i < groupEdges.length; i++) currentEdges.push(groupEdges[i]!);
       currentSize += groupSize;
     }
 

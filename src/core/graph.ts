@@ -270,6 +270,53 @@ export class CodeGraph {
     return result;
   }
 
+  /**
+   * Get outbound neighbor IDs without allocating intermediate CodeEdge[] arrays.
+   * Used by traversal hot paths (BFS/DFS) where only target IDs are needed.
+   */
+  getOutNeighborIds(nodeId: string, edgeTypes?: EdgeType[]): string[] {
+    const edgeIds = this.outEdges.get(nodeId);
+    if (!edgeIds || edgeIds.size === 0) return [];
+
+    const typeFilter = edgeTypes && edgeTypes.length > 2 ? new Set(edgeTypes) : edgeTypes;
+    const result: string[] = [];
+    for (const eid of edgeIds) {
+      const edge = this.edges.get(eid);
+      if (edge) {
+        if (
+          !typeFilter ||
+          (typeFilter instanceof Set ? typeFilter.has(edge.type) : typeFilter.includes(edge.type))
+        ) {
+          result.push(edge.target);
+        }
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Get inbound neighbor IDs without allocating intermediate CodeEdge[] arrays.
+   */
+  getInNeighborIds(nodeId: string, edgeTypes?: EdgeType[]): string[] {
+    const edgeIds = this.inEdges.get(nodeId);
+    if (!edgeIds || edgeIds.size === 0) return [];
+
+    const typeFilter = edgeTypes && edgeTypes.length > 2 ? new Set(edgeTypes) : edgeTypes;
+    const result: string[] = [];
+    for (const eid of edgeIds) {
+      const edge = this.edges.get(eid);
+      if (edge) {
+        if (
+          !typeFilter ||
+          (typeFilter instanceof Set ? typeFilter.has(edge.type) : typeFilter.includes(edge.type))
+        ) {
+          result.push(edge.source);
+        }
+      }
+    }
+    return result;
+  }
+
   /** Get outbound neighbor nodes. */
   getSuccessors(nodeId: string, edgeTypes?: EdgeType[]): CodeNode[] {
     const edges = this.getOutEdges(nodeId, edgeTypes);
@@ -335,6 +382,24 @@ export class CodeGraph {
       return result;
     }
 
+    // Fast path: exact name filter — use O(1) index
+    if (filter.name && typeof filter.name === 'string' && !filter.file) {
+      const candidates = this.findByName(filter.name);
+      if (!filter.type && filter.hasEmbedding === undefined) return candidates;
+      const types = filter.type
+        ? new Set(Array.isArray(filter.type) ? filter.type : [filter.type])
+        : null;
+      const result: CodeNode[] = [];
+      for (const node of candidates) {
+        if (types && !types.has(node.type)) continue;
+        if (filter.hasEmbedding !== undefined) {
+          if (filter.hasEmbedding !== (node.embedding !== null)) continue;
+        }
+        result.push(node);
+      }
+      return result;
+    }
+
     // Fast path: file-only filter
     if (filter.file && typeof filter.file === 'string' && !filter.type && !filter.name) {
       const ids = this.nodesByFile.get(filter.file);
@@ -353,30 +418,28 @@ export class CodeGraph {
     }
 
     // General filter: scan all nodes
-    // Pre-compute lowercased name outside the loop to avoid per-node allocation
+    // Pre-compute filter values outside the loop to avoid per-node work
     const filterNameLower =
       filter.name && typeof filter.name === 'string' ? filter.name.toLowerCase() : null;
+    const filterTypes = filter.type
+      ? new Set(Array.isArray(filter.type) ? filter.type : [filter.type])
+      : null;
+    const filterNameRegex = filter.name instanceof RegExp ? filter.name : null;
+    const filterFileStr = filter.file && typeof filter.file === 'string' ? filter.file : null;
+    const filterFileRegex = filter.file instanceof RegExp ? filter.file : null;
+
     const result: CodeNode[] = [];
     for (const node of this.nodes.values()) {
-      if (filter.type) {
-        const types = Array.isArray(filter.type) ? filter.type : [filter.type];
-        if (!types.includes(node.type)) continue;
+      if (filterTypes && !filterTypes.has(node.type)) continue;
+      if (filterNameLower !== null) {
+        if (node.name.toLowerCase() !== filterNameLower) continue;
+      } else if (filterNameRegex) {
+        if (!filterNameRegex.test(node.name)) continue;
       }
-      if (filter.name) {
-        if (typeof filter.name === 'string') {
-          // Use the index for O(1) exact name lookup instead of scanning
-          if (node.name.toLowerCase() !== filterNameLower) continue;
-        } else {
-          if (!filter.name.test(node.name)) continue;
-        }
-      }
-      if (filter.file) {
-        if (!node.location) continue;
-        if (typeof filter.file === 'string') {
-          if (node.location.file !== filter.file) continue;
-        } else {
-          if (!filter.file.test(node.location.file)) continue;
-        }
+      if (filterFileStr !== null) {
+        if (!node.location || node.location.file !== filterFileStr) continue;
+      } else if (filterFileRegex) {
+        if (!node.location || !filterFileRegex.test(node.location.file)) continue;
       }
       if (filter.hasEmbedding !== undefined) {
         if (filter.hasEmbedding !== (node.embedding !== null)) continue;

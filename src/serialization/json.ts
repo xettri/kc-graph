@@ -9,13 +9,29 @@ const SNAPSHOT_VERSION = '1.0';
  */
 export function exportToJSON(graph: CodeGraph): GraphSnapshot {
   const nodes: SerializedNode[] = [];
-  const edges = [...graph.allEdges()];
 
+  // Explicit property copy avoids spread's hidden Object.assign overhead
+  // and keeps the output shape monomorphic for V8
   for (const node of graph.allNodes()) {
     nodes.push({
-      ...node,
+      id: node.id,
+      type: node.type,
+      name: node.name,
+      qualifiedName: node.qualifiedName,
+      content: node.content,
+      signature: node.signature,
+      location: node.location,
+      metadata: node.metadata,
       embedding: node.embedding ? float32ToBase64(node.embedding) : null,
+      createdAt: node.createdAt,
+      updatedAt: node.updatedAt,
     });
+  }
+
+  // Collect edges via push loop instead of spread
+  const edges: import('../core/types.js').CodeEdge[] = [];
+  for (const edge of graph.allEdges()) {
+    edges.push(edge);
   }
 
   return {

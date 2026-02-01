@@ -132,28 +132,29 @@ export function kHopNeighborhood(
   return result;
 }
 
-/** Helper: get neighbor IDs in the specified direction. */
+/**
+ * Get neighbor IDs using direct ID accessors that skip CodeEdge[] allocation.
+ * Falls back to outbound-only or inbound-only arrays to avoid merging when possible.
+ */
 function getDirectedNeighborIds(
   graph: CodeGraph,
   nodeId: string,
   direction: 'outbound' | 'inbound' | 'both',
   edgeTypes?: EdgeType[],
 ): string[] {
-  const ids: string[] = [];
-
-  if (direction === 'outbound' || direction === 'both') {
-    const edges = graph.getOutEdges(nodeId, edgeTypes);
-    for (const edge of edges) {
-      ids.push(edge.target);
-    }
+  if (direction === 'outbound') {
+    return graph.getOutNeighborIds(nodeId, edgeTypes);
   }
-
-  if (direction === 'inbound' || direction === 'both') {
-    const edges = graph.getInEdges(nodeId, edgeTypes);
-    for (const edge of edges) {
-      ids.push(edge.source);
-    }
+  if (direction === 'inbound') {
+    return graph.getInNeighborIds(nodeId, edgeTypes);
   }
-
-  return ids;
+  // 'both' — merge; reuse outbound array to avoid extra allocation
+  const outIds = graph.getOutNeighborIds(nodeId, edgeTypes);
+  const inIds = graph.getInNeighborIds(nodeId, edgeTypes);
+  if (inIds.length === 0) return outIds;
+  if (outIds.length === 0) return inIds;
+  for (let i = 0; i < inIds.length; i++) {
+    outIds.push(inIds[i]!);
+  }
+  return outIds;
 }

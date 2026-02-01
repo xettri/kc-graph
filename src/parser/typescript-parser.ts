@@ -20,7 +20,11 @@ export function parseTypeScriptSource(
   const ts = loadTypeScript();
 
   const sourceFile = ts.createSourceFile(filePath, sourceCode, ts.ScriptTarget.Latest, true);
-  const lineCount = sourceCode.split('\n').length;
+  // Count newlines without allocating a string array — avoids O(n) split overhead
+  let lineCount = 1;
+  for (let i = 0; i < sourceCode.length; i++) {
+    if (sourceCode.charCodeAt(i) === 10) lineCount++;
+  }
 
   const nodes: ParsedNodeInfo[] = [];
   const edges: ParsedEdgeInfo[] = [];
@@ -771,8 +775,9 @@ function resolveModulePath(fromFile: string, specifier: string): string {
 
   let result = resolved.join('/');
 
-  // Add .ts extension if no extension present (common convention)
-  if (!result.match(/\.[a-zA-Z]+$/)) {
+  // Add .ts extension if no extension present — use indexOf instead of regex
+  const lastDot = result.lastIndexOf('.');
+  if (lastDot === -1 || lastDot < result.lastIndexOf('/')) {
     result += '.ts';
   }
 

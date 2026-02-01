@@ -136,16 +136,17 @@ export async function syncProject(options: IndexOptions = {}): Promise<SyncResul
     }
   }
 
-  // If nothing changed, short-circuit
+  // If nothing changed, short-circuit — read meta once to avoid double file I/O
   if (changedFiles.length === 0 && newFiles.length === 0 && deletedFiles.length === 0) {
+    const meta = store.readMeta();
     return {
       added: 0,
       updated: 0,
       removed: 0,
       chunksWritten: 0,
       chunksDeleted: 0,
-      totalNodes: store.readMeta().stats.nodes,
-      totalEdges: store.readMeta().stats.edges,
+      totalNodes: meta.stats.nodes,
+      totalEdges: meta.stats.edges,
       totalFiles: Object.keys(map.files).length,
       totalChunks: Object.keys(map.chunks).length,
       duration: performance.now() - start,
@@ -158,9 +159,12 @@ export async function syncProject(options: IndexOptions = {}): Promise<SyncResul
   const filesToReindex = [...changedFiles, ...newFiles];
   const total = filesToReindex.length;
 
+  // Build a Map for O(1) lookup instead of O(n) .find() per file
+  const discoveredByPath = new Map(discoveredFiles.map((f) => [f.relativePath, f]));
+
   for (let i = 0; i < filesToReindex.length; i++) {
     const relPath = filesToReindex[i]!;
-    const discovered = discoveredFiles.find((f) => f.relativePath === relPath);
+    const discovered = discoveredByPath.get(relPath);
     if (!discovered) continue;
 
     options.onProgress?.(relPath, i + 1, total);

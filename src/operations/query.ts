@@ -98,21 +98,21 @@ export class GraphQuery {
     return this;
   }
 
+  /** Test a node against all accumulated filters. Indexed for-loop is monomorphic in V8. */
+  private _matches(node: CodeNode): boolean {
+    const filters = this.filters;
+    for (let i = 0; i < filters.length; i++) {
+      if (!filters[i]!(node)) return false;
+    }
+    return true;
+  }
+
   /** Execute the query and return matching nodes. */
   results(): CodeNode[] {
     const result: CodeNode[] = [];
-
     for (const node of this.graph.allNodes()) {
-      let match = true;
-      for (const filter of this.filters) {
-        if (!filter(node)) {
-          match = false;
-          break;
-        }
-      }
-      if (match) result.push(node);
+      if (this._matches(node)) result.push(node);
     }
-
     return result;
   }
 
@@ -120,14 +120,7 @@ export class GraphQuery {
   count(): number {
     let count = 0;
     for (const node of this.graph.allNodes()) {
-      let match = true;
-      for (const filter of this.filters) {
-        if (!filter(node)) {
-          match = false;
-          break;
-        }
-      }
-      if (match) count++;
+      if (this._matches(node)) count++;
     }
     return count;
   }
@@ -135,14 +128,7 @@ export class GraphQuery {
   /** Execute and return first match only. */
   first(): CodeNode | undefined {
     for (const node of this.graph.allNodes()) {
-      let match = true;
-      for (const filter of this.filters) {
-        if (!filter(node)) {
-          match = false;
-          break;
-        }
-      }
-      if (match) return node;
+      if (this._matches(node)) return node;
     }
     return undefined;
   }
