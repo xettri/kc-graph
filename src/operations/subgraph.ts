@@ -51,23 +51,21 @@ export function extractSubgraph(
     }
   }
 
-  // Add edges between included nodes
+  // Add edges between included nodes.
+  // Use hasEdge() check instead of try/catch — V8 exception handling is expensive
+  // and deoptimizes surrounding code.
   for (const nodeId of includedNodeIds) {
     const outEdges = graph.getOutEdges(nodeId, edgeTypes);
     for (const edge of outEdges) {
-      if (includedNodeIds.has(edge.target)) {
-        try {
-          subgraph.addEdge({
-            id: edge.id,
-            source: edge.source,
-            target: edge.target,
-            type: edge.type,
-            weight: edge.weight,
-            metadata: edge.metadata,
-          });
-        } catch {
-          // Edge already exists (can happen with overlapping seed neighborhoods)
-        }
+      if (includedNodeIds.has(edge.target) && !subgraph.hasEdge(edge.id)) {
+        subgraph.addEdge({
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          type: edge.type,
+          weight: edge.weight,
+          metadata: edge.metadata,
+        });
       }
     }
   }

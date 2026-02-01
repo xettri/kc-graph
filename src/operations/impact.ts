@@ -26,6 +26,10 @@ export interface ImpactOptions {
  * Traces through the graph following relationship edges to find all nodes
  * that would be affected by a change to the source node. Returns results
  * sorted by distance (closest = most impacted).
+ *
+ * V8-optimized: Uses parent-pointer chain instead of copying path arrays
+ * at every BFS step. Paths are reconstructed on demand only for the final
+ * result, reducing allocations from O(V × depth²) to O(V).
  */
 export function analyzeImpact(
   graph: CodeGraph,
@@ -41,81 +45,106 @@ export function analyzeImpact(
     throw new Error(`Node not found: ${nodeId}`);
   }
 
-  const impacted: ImpactedNode[] = [];
   const visited = new Set<string>();
   visited.add(nodeId);
 
-  // BFS with path tracking
-  const queue: Array<{
-    id: string;
-    depth: number;
-    path: string[];
-    edgeTypesUsed: EdgeType[];
-  }> = [];
+  // BFS using parallel arrays + parent pointers instead of object-per-entry.
+  // This avoids O(depth) array copies per queue item ([...path, id]).
+  const queueIds: string[] = [];
+  const queueDepths: number[] = [];
+  const queueParents: number[] = []; // index into queue, -1 = root
+  const queueEdgeTypes: EdgeType[] = []; // edge type used to reach this node
+
+  // Sentinel entry for the source node (index 0)
+  queueIds.push(nodeId);
+  queueDepths.push(0);
+  queueParents.push(-1);
+  queueEdgeTypes.push('calls'); // placeholder, unused
 
   // Seed: follow edges in the appropriate direction
   const seedEdges =
     direction === 'dependents'
-      ? graph.getInEdges(nodeId, edgeTypes) // who points to me?
-      : graph.getOutEdges(nodeId, edgeTypes); // what do I point to?
+      ? graph.getInEdges(nodeId, edgeTypes)
+      : graph.getOutEdges(nodeId, edgeTypes);
 
   for (const edge of seedEdges) {
     const neighborId = direction === 'dependents' ? edge.source : edge.target;
     if (!visited.has(neighborId)) {
       visited.add(neighborId);
-      queue.push({
-        id: neighborId,
-        depth: 1,
-        path: [nodeId, neighborId],
-        edgeTypesUsed: [edge.type],
-      });
+      queueIds.push(neighborId);
+      queueDepths.push(1);
+      queueParents.push(0); // parent is the source node at index 0
+      queueEdgeTypes.push(edge.type);
     }
   }
 
-  let head = 0;
+  let head = 1; // start after sentinel
 
-  while (head < queue.length) {
-    const current = queue[head++]!;
-    const node = graph.getNode(current.id);
-    if (!node) continue;
+  while (head < queueIds.length) {
+    const currentId = queueIds[head]!;
+    const currentDepth = queueDepths[head]!;
 
-    impacted.push({
-      node,
-      distance: current.depth,
-      path: current.path,
-      edgeTypes: current.edgeTypesUsed,
-    });
+    const node = graph.getNode(currentId);
+    if (!node) {
+      head++;
+      continue;
+    }
 
-    if (current.depth >= maxDepth) continue;
+    if (currentDepth < maxDepth) {
+      const nextEdges =
+        direction === 'dependents'
+          ? graph.getInEdges(currentId, edgeTypes)
+          : graph.getOutEdges(currentId, edgeTypes);
 
-    const nextEdges =
-      direction === 'dependents'
-        ? graph.getInEdges(current.id, edgeTypes)
-        : graph.getOutEdges(current.id, edgeTypes);
-
-    for (const edge of nextEdges) {
-      const neighborId = direction === 'dependents' ? edge.source : edge.target;
-      if (!visited.has(neighborId)) {
-        visited.add(neighborId);
-        queue.push({
-          id: neighborId,
-          depth: current.depth + 1,
-          path: [...current.path, neighborId],
-          edgeTypesUsed: [...current.edgeTypesUsed, edge.type],
-        });
+      for (const edge of nextEdges) {
+        const neighborId = direction === 'dependents' ? edge.source : edge.target;
+        if (!visited.has(neighborId)) {
+          visited.add(neighborId);
+          queueIds.push(neighborId);
+          queueDepths.push(currentDepth + 1);
+          queueParents.push(head);
+          queueEdgeTypes.push(edge.type);
+        }
       }
     }
+
+    head++;
   }
 
-  // Sort by distance (closest first)
-  impacted.sort((a, b) => a.distance - b.distance);
-
-  // Compute stats
+  // Build results: reconstruct paths from parent pointers.
+  // BFS guarantees items are already ordered by distance, so no sort needed.
+  const impacted: ImpactedNode[] = [];
   const fileSet = new Set<string>();
   let maxImpactDepth = 0;
-  for (const item of impacted) {
-    if (item.node.location) fileSet.add(item.node.location.file);
-    if (item.distance > maxImpactDepth) maxImpactDepth = item.distance;
+
+  for (let i = 1; i < queueIds.length; i++) {
+    const node = graph.getNode(queueIds[i]!);
+    if (!node) continue;
+
+    const depth = queueDepths[i]!;
+
+    // Reconstruct path by walking parent pointers
+    const path: string[] = [];
+    let idx = i;
+    while (idx !== -1) {
+      path.push(queueIds[idx]!);
+      idx = queueParents[idx]!;
+    }
+    path.reverse();
+
+    // Collect edge types along the path
+    const edgeTypesUsed: EdgeType[] = [];
+    idx = i;
+    while (queueParents[idx]! !== -1) {
+      edgeTypesUsed.push(queueEdgeTypes[idx]!);
+      idx = queueParents[idx]!;
+    }
+    edgeTypesUsed.reverse();
+
+    impacted.push({ node, distance: depth, path, edgeTypes: edgeTypesUsed });
+
+    if (node.location) fileSet.add(node.location.file);
+    if (depth > maxImpactDepth) maxImpactDepth = depth;
   }
 
   return {

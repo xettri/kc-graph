@@ -39,8 +39,13 @@ export class GraphQuery {
   /** Filter by name (exact case-insensitive or regex). */
   withName(name: string | RegExp): this {
     if (typeof name === 'string') {
+      // Pre-compute lowercased name once; avoids per-node toLowerCase() allocation
       const lower = name.toLowerCase();
-      this.filters.push((node) => node.name.toLowerCase() === lower);
+      this.filters.push((node) => {
+        const nl = node.name.length;
+        if (nl !== lower.length) return false; // fast length check
+        return node.name.toLowerCase() === lower;
+      });
     } else {
       this.filters.push((node) => name.test(node.name));
     }

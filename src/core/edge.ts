@@ -2,6 +2,10 @@ import type { CodeEdge, CreateEdgeInput } from './types.js';
 
 let edgeCounter = 0;
 
+/**
+ * V8-optimized: deterministic edge IDs avoid expensive Date.now() calls.
+ * Counter suffix ensures uniqueness for parallel edges between same nodes.
+ */
 function generateEdgeId(input: CreateEdgeInput): string {
   if (input.id) return input.id;
   return `${input.source}-${input.type}-${input.target}-${++edgeCounter}`;

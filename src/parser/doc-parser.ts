@@ -64,10 +64,16 @@ interface MarkdownSection {
   endLine: number;
 }
 
+/**
+ * V8-optimized: uses array accumulation + join() instead of += string concat.
+ * String += in a loop is O(n²) because each concat copies the entire string.
+ * Array push + join is O(n) total.
+ */
 function parseMarkdownSections(content: string): MarkdownSection[] {
   const lines = content.split('\n');
   const sections: MarkdownSection[] = [];
   let currentSection: MarkdownSection | null = null;
+  let contentLines: string[] = [];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
@@ -76,12 +82,13 @@ function parseMarkdownSections(content: string): MarkdownSection[] {
     if (headingMatch) {
       if (currentSection) {
         currentSection.endLine = i;
-        currentSection.content = currentSection.content.trim();
+        currentSection.content = contentLines.join('\n').trim();
         if (currentSection.content) {
           sections.push(currentSection);
         }
       }
 
+      contentLines = [];
       currentSection = {
         title: headingMatch[2]!.trim(),
         content: '',
@@ -90,12 +97,12 @@ function parseMarkdownSections(content: string): MarkdownSection[] {
         endLine: lines.length,
       };
     } else if (currentSection) {
-      currentSection.content += line + '\n';
+      contentLines.push(line);
     }
   }
 
   if (currentSection) {
-    currentSection.content = currentSection.content.trim();
+    currentSection.content = contentLines.join('\n').trim();
     if (currentSection.content) {
       sections.push(currentSection);
     }

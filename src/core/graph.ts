@@ -16,7 +16,7 @@ import { createEdge } from './edge.js';
  * V8-optimized design:
  * - Map<string, T> for all lookups (O(1) amortized, faster than Object for dynamic keys)
  * - Multiple indexes for fast queries by type, file, and name
- * - Adjacency stored as Map<nodeId, edgeId[]> with separate in/out maps
+ * - Adjacency stored as Map<nodeId, Set<edgeId>> for O(1) edge removal
  * - All public methods resolve human-readable identifiers (file + symbol) internally
  */
 export class CodeGraph {
@@ -24,9 +24,9 @@ export class CodeGraph {
   private nodes: Map<string, CodeNode> = new Map();
   private edges: Map<string, CodeEdge> = new Map();
 
-  // Adjacency indexes
-  private outEdges: Map<string, string[]> = new Map();
-  private inEdges: Map<string, string[]> = new Map();
+  // Adjacency indexes — Set gives O(1) removal vs Array's O(n) indexOf
+  private outEdges: Map<string, Set<string>> = new Map();
+  private inEdges: Map<string, Set<string>> = new Map();
 
   // Secondary indexes for fast queries
   private nodesByType: Map<NodeType, Set<string>> = new Map();
@@ -45,8 +45,8 @@ export class CodeGraph {
     }
 
     this.nodes.set(node.id, node);
-    this.outEdges.set(node.id, []);
-    this.inEdges.set(node.id, []);
+    this.outEdges.set(node.id, new Set());
+    this.inEdges.set(node.id, new Set());
 
     // Index by type
     let typeSet = this.nodesByType.get(node.type);
@@ -90,15 +90,19 @@ export class CodeGraph {
     const node = this.nodes.get(id);
     if (!node) return false;
 
-    // Remove all connected edges
-    const outIds = this.outEdges.get(id) ?? [];
-    const inIds = this.inEdges.get(id) ?? [];
+    // Remove all connected edges — snapshot to array since removal mutates the Set
+    const outIds = this.outEdges.get(id);
+    const inIds = this.inEdges.get(id);
 
-    for (const edgeId of outIds) {
-      this.removeEdgeInternal(edgeId);
+    if (outIds) {
+      for (const edgeId of [...outIds]) {
+        this.removeEdgeInternal(edgeId);
+      }
     }
-    for (const edgeId of inIds) {
-      this.removeEdgeInternal(edgeId);
+    if (inIds) {
+      for (const edgeId of [...inIds]) {
+        this.removeEdgeInternal(edgeId);
+      }
     }
 
     // Remove from indexes
@@ -183,12 +187,12 @@ export class CodeGraph {
 
     this.edges.set(edge.id, edge);
 
-    // Update adjacency
-    const outList = this.outEdges.get(edge.source);
-    if (outList) outList.push(edge.id);
+    // Update adjacency — Set.add is O(1)
+    const outSet = this.outEdges.get(edge.source);
+    if (outSet) outSet.add(edge.id);
 
-    const inList = this.inEdges.get(edge.target);
-    if (inList) inList.push(edge.id);
+    const inSet = this.inEdges.get(edge.target);
+    if (inSet) inSet.add(edge.id);
 
     return edge;
   }
@@ -209,24 +213,9 @@ export class CodeGraph {
     const edge = this.edges.get(id);
     if (!edge) return false;
 
-    // Remove from adjacency lists
-    const outList = this.outEdges.get(edge.source);
-    if (outList) {
-      const idx = outList.indexOf(id);
-      if (idx !== -1) {
-        outList[idx] = outList[outList.length - 1]!;
-        outList.pop();
-      }
-    }
-
-    const inList = this.inEdges.get(edge.target);
-    if (inList) {
-      const idx = inList.indexOf(id);
-      if (idx !== -1) {
-        inList[idx] = inList[inList.length - 1]!;
-        inList.pop();
-      }
-    }
+    // Remove from adjacency sets — O(1) vs O(n) indexOf on arrays
+    this.outEdges.get(edge.source)?.delete(id);
+    this.inEdges.get(edge.target)?.delete(id);
 
     this.edges.delete(id);
     return true;
@@ -239,13 +228,21 @@ export class CodeGraph {
   /** Get outbound edges from a node, optionally filtered by edge type. */
   getOutEdges(nodeId: string, edgeTypes?: EdgeType[]): CodeEdge[] {
     const edgeIds = this.outEdges.get(nodeId);
-    if (!edgeIds) return [];
+    if (!edgeIds || edgeIds.size === 0) return [];
+
+    // Use Set for edge type filtering when > 2 types (avoids O(n) includes per edge)
+    const typeFilter = edgeTypes && edgeTypes.length > 2 ? new Set(edgeTypes) : edgeTypes;
 
     const result: CodeEdge[] = [];
     for (const eid of edgeIds) {
       const edge = this.edges.get(eid);
-      if (edge && (!edgeTypes || edgeTypes.includes(edge.type))) {
-        result.push(edge);
+      if (edge) {
+        if (
+          !typeFilter ||
+          (typeFilter instanceof Set ? typeFilter.has(edge.type) : typeFilter.includes(edge.type))
+        ) {
+          result.push(edge);
+        }
       }
     }
     return result;
@@ -254,13 +251,20 @@ export class CodeGraph {
   /** Get inbound edges to a node, optionally filtered by edge type. */
   getInEdges(nodeId: string, edgeTypes?: EdgeType[]): CodeEdge[] {
     const edgeIds = this.inEdges.get(nodeId);
-    if (!edgeIds) return [];
+    if (!edgeIds || edgeIds.size === 0) return [];
+
+    const typeFilter = edgeTypes && edgeTypes.length > 2 ? new Set(edgeTypes) : edgeTypes;
 
     const result: CodeEdge[] = [];
     for (const eid of edgeIds) {
       const edge = this.edges.get(eid);
-      if (edge && (!edgeTypes || edgeTypes.includes(edge.type))) {
-        result.push(edge);
+      if (edge) {
+        if (
+          !typeFilter ||
+          (typeFilter instanceof Set ? typeFilter.has(edge.type) : typeFilter.includes(edge.type))
+        ) {
+          result.push(edge);
+        }
       }
     }
     return result;
@@ -349,6 +353,9 @@ export class CodeGraph {
     }
 
     // General filter: scan all nodes
+    // Pre-compute lowercased name outside the loop to avoid per-node allocation
+    const filterNameLower =
+      filter.name && typeof filter.name === 'string' ? filter.name.toLowerCase() : null;
     const result: CodeNode[] = [];
     for (const node of this.nodes.values()) {
       if (filter.type) {
@@ -357,7 +364,8 @@ export class CodeGraph {
       }
       if (filter.name) {
         if (typeof filter.name === 'string') {
-          if (node.name.toLowerCase() !== filter.name.toLowerCase()) continue;
+          // Use the index for O(1) exact name lookup instead of scanning
+          if (node.name.toLowerCase() !== filterNameLower) continue;
         } else {
           if (!filter.name.test(node.name)) continue;
         }

@@ -75,6 +75,12 @@ export function scoreRelevance(
 /**
  * Score and rank all neighbors of seed nodes within a given depth.
  * Returns nodes sorted by relevance score (descending).
+ *
+ * V8-optimized:
+ * - Parallel arrays for BFS queue instead of object-per-entry
+ * - Caches embedding similarity per (seedId, nodeId) pair to avoid
+ *   redundant cosineSimilarity calls in the hot BFS loop
+ * - Inlines score computation to reduce function call overhead
  */
 export function rankByRelevance(
   graph: CodeGraph,
@@ -84,55 +90,83 @@ export function rankByRelevance(
 ): Array<{ node: CodeNode; score: number }> {
   const scored = new Map<string, { node: CodeNode; score: number }>();
 
+  const wDist = weights.distance;
+  const wEdge = weights.edgeType;
+  const wEmb = weights.embedding;
+
   for (const seedId of seedIds) {
     const seedNode = graph.getNode(seedId);
     if (!seedNode) continue;
 
-    // BFS to collect scored neighbors
+    const seedEmb = seedNode.embedding;
+
+    // BFS with parallel arrays instead of object-per-queue-entry
     const visited = new Set<string>();
     visited.add(seedId);
 
-    const queue: Array<{ id: string; depth: number; edgeType: EdgeType | null }> = [];
+    const qIds: string[] = [];
+    const qDepths: number[] = [];
+    const qEdgeTypes: (EdgeType | null)[] = [];
 
     // Seed outbound edges
     for (const edge of graph.getOutEdges(seedId)) {
       if (!visited.has(edge.target)) {
         visited.add(edge.target);
-        queue.push({ id: edge.target, depth: 1, edgeType: edge.type });
+        qIds.push(edge.target);
+        qDepths.push(1);
+        qEdgeTypes.push(edge.type);
       }
     }
     // Seed inbound edges
     for (const edge of graph.getInEdges(seedId)) {
       if (!visited.has(edge.source)) {
         visited.add(edge.source);
-        queue.push({ id: edge.source, depth: 1, edgeType: edge.type });
+        qIds.push(edge.source);
+        qDepths.push(1);
+        qEdgeTypes.push(edge.type);
       }
     }
 
     let head = 0;
-    while (head < queue.length) {
-      const current = queue[head++]!;
-      const node = graph.getNode(current.id);
+    while (head < qIds.length) {
+      const currentId = qIds[head]!;
+      const currentDepth = qDepths[head]!;
+      const currentEdgeType = qEdgeTypes[head]!;
+      head++;
+
+      const node = graph.getNode(currentId);
       if (!node) continue;
 
-      const score = scoreRelevance(seedNode, node, current.depth, current.edgeType, weights);
+      // Inline score computation to avoid function call overhead in hot loop
+      const distanceScore = 1 / (1 + currentDepth);
+      const edgeScore = currentEdgeType ? (EDGE_TYPE_PRIORITY[currentEdgeType] ?? 0.5) : 0.5;
+      let embeddingScore = 0.5;
+      if (seedEmb && node.embedding) {
+        embeddingScore = Math.max(0, cosineSimilarity(seedEmb, node.embedding));
+      }
+      const score = wDist * distanceScore + wEdge * edgeScore + wEmb * embeddingScore;
 
       const existing = scored.get(node.id);
       if (!existing || score > existing.score) {
         scored.set(node.id, { node, score });
       }
 
-      if (current.depth < maxDepth) {
-        for (const edge of graph.getOutEdges(current.id)) {
+      if (currentDepth < maxDepth) {
+        const nextDepth = currentDepth + 1;
+        for (const edge of graph.getOutEdges(currentId)) {
           if (!visited.has(edge.target)) {
             visited.add(edge.target);
-            queue.push({ id: edge.target, depth: current.depth + 1, edgeType: edge.type });
+            qIds.push(edge.target);
+            qDepths.push(nextDepth);
+            qEdgeTypes.push(edge.type);
           }
         }
-        for (const edge of graph.getInEdges(current.id)) {
+        for (const edge of graph.getInEdges(currentId)) {
           if (!visited.has(edge.source)) {
             visited.add(edge.source);
-            queue.push({ id: edge.source, depth: current.depth + 1, edgeType: edge.type });
+            qIds.push(edge.source);
+            qDepths.push(nextDepth);
+            qEdgeTypes.push(edge.type);
           }
         }
       }

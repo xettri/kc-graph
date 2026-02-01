@@ -4,6 +4,10 @@ import type { CodeNode, EdgeType, TraversalOptions } from '../core/types.js';
 /**
  * Breadth-first traversal from a starting node.
  * Generator-based for lazy evaluation — stops when consumer stops iterating.
+ *
+ * V8-optimized: uses parallel arrays instead of object-per-queue-entry,
+ * reducing GC pressure from O(V) object allocations to zero.
+ * Only one result object is yielded at a time (reusable shape).
  */
 export function* bfs(
   graph: CodeGraph,
@@ -15,29 +19,38 @@ export function* bfs(
   const edgeTypes = options.edgeTypes;
 
   const visited = new Set<string>();
-  const queue: Array<{ id: string; depth: number; parentId: string | null }> = [];
+
+  // Parallel arrays: avoids allocating an object per queue entry
+  const qIds: string[] = [startId];
+  const qDepths: number[] = [0];
+  const qParents: (string | null)[] = [null];
 
   visited.add(startId);
-  queue.push({ id: startId, depth: 0, parentId: null });
 
-  let head = 0; // Array-based queue avoids shift() O(n) cost
+  let head = 0;
 
-  while (head < queue.length) {
-    const current = queue[head++]!;
+  while (head < qIds.length) {
+    const id = qIds[head]!;
+    const depth = qDepths[head]!;
+    const parentId = qParents[head]!;
+    head++;
 
-    const node = graph.getNode(current.id);
+    const node = graph.getNode(id);
     if (!node) continue;
 
-    yield { node, depth: current.depth, parentId: current.parentId };
+    yield { node, depth, parentId };
 
-    if (current.depth >= maxDepth) continue;
+    if (depth >= maxDepth) continue;
 
-    const neighbors = getDirectedNeighborIds(graph, current.id, direction, edgeTypes);
+    const nextDepth = depth + 1;
+    const neighbors = getDirectedNeighborIds(graph, id, direction, edgeTypes);
 
     for (const neighborId of neighbors) {
       if (!visited.has(neighborId)) {
         visited.add(neighborId);
-        queue.push({ id: neighborId, depth: current.depth + 1, parentId: current.id });
+        qIds.push(neighborId);
+        qDepths.push(nextDepth);
+        qParents.push(id);
       }
     }
   }
@@ -46,6 +59,8 @@ export function* bfs(
 /**
  * Depth-first traversal from a starting node.
  * Generator-based for lazy evaluation.
+ *
+ * V8-optimized: parallel arrays for stack instead of object-per-entry.
  */
 export function* dfs(
   graph: CodeGraph,
@@ -57,30 +72,37 @@ export function* dfs(
   const edgeTypes = options.edgeTypes;
 
   const visited = new Set<string>();
-  const stack: Array<{ id: string; depth: number; parentId: string | null }> = [];
 
-  stack.push({ id: startId, depth: 0, parentId: null });
+  // Parallel arrays for stack
+  const sIds: string[] = [startId];
+  const sDepths: number[] = [0];
+  const sParents: (string | null)[] = [null];
 
-  while (stack.length > 0) {
-    const current = stack.pop()!;
+  while (sIds.length > 0) {
+    const id = sIds.pop()!;
+    const depth = sDepths.pop()!;
+    const parentId = sParents.pop()!;
 
-    if (visited.has(current.id)) continue;
-    visited.add(current.id);
+    if (visited.has(id)) continue;
+    visited.add(id);
 
-    const node = graph.getNode(current.id);
+    const node = graph.getNode(id);
     if (!node) continue;
 
-    yield { node, depth: current.depth, parentId: current.parentId };
+    yield { node, depth, parentId };
 
-    if (current.depth >= maxDepth) continue;
+    if (depth >= maxDepth) continue;
 
-    const neighbors = getDirectedNeighborIds(graph, current.id, direction, edgeTypes);
+    const nextDepth = depth + 1;
+    const neighbors = getDirectedNeighborIds(graph, id, direction, edgeTypes);
 
     // Push in reverse order so that first neighbor is processed first
     for (let i = neighbors.length - 1; i >= 0; i--) {
       const neighborId = neighbors[i]!;
       if (!visited.has(neighborId)) {
-        stack.push({ id: neighborId, depth: current.depth + 1, parentId: current.id });
+        sIds.push(neighborId);
+        sDepths.push(nextDepth);
+        sParents.push(id);
       }
     }
   }

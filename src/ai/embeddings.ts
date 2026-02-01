@@ -57,6 +57,10 @@ export function cosineSimilarity(a: Float32Array, b: Float32Array): number {
  * Find the k most similar nodes to a query embedding.
  * Uses brute-force cosine similarity (no external index required).
  *
+ * V8-optimized: uses a bounded min-heap of size k instead of collecting all
+ * results and sorting. This reduces complexity from O(n log n) to O(n log k)
+ * and avoids allocating an unbounded results array.
+ *
  * For typical code graph sizes (<100k nodes), brute force on Float32Arrays
  * is fast enough (< 50ms for 100k vectors of dimension 384).
  */
@@ -66,22 +70,56 @@ export function findSimilar(
   k: number,
   threshold: number = 0,
 ): SimilarityResult[] {
-  const results: SimilarityResult[] = [];
+  // For small k, use a bounded min-heap: keep only the top-k highest scores.
+  // The heap root is the *minimum* of the top-k, so we can quickly reject
+  // candidates that can't make it into the result set.
+  const heap: SimilarityResult[] = [];
 
   for (const node of graph.allNodes()) {
     if (!node.embedding) continue;
 
     const score = cosineSimilarity(queryEmbedding, node.embedding);
-    if (score >= threshold) {
-      results.push({ node, score });
+    if (score < threshold) continue;
+
+    if (heap.length < k) {
+      heap.push({ node, score });
+      if (heap.length === k) heapify(heap); // build min-heap once full
+    } else if (score > heap[0]!.score) {
+      // Replace the min element and sift down
+      heap[0] = { node, score };
+      siftDown(heap, 0);
     }
   }
 
-  // Sort descending by score
-  results.sort((a, b) => b.score - a.score);
+  // Extract in descending order
+  heap.sort((a, b) => b.score - a.score);
+  return heap;
+}
 
-  // Return top-k
-  return results.slice(0, k);
+// ---------------------------------------------------------------------------
+// Min-heap helpers (by score ascending — root is smallest)
+// ---------------------------------------------------------------------------
+
+function heapify(h: SimilarityResult[]): void {
+  for (let i = (h.length >> 1) - 1; i >= 0; i--) {
+    siftDown(h, i);
+  }
+}
+
+function siftDown(h: SimilarityResult[], i: number): void {
+  const n = h.length;
+  while (true) {
+    let smallest = i;
+    const l = 2 * i + 1;
+    const r = 2 * i + 2;
+    if (l < n && h[l]!.score < h[smallest]!.score) smallest = l;
+    if (r < n && h[r]!.score < h[smallest]!.score) smallest = r;
+    if (smallest === i) break;
+    const tmp = h[i]!;
+    h[i] = h[smallest]!;
+    h[smallest] = tmp;
+    i = smallest;
+  }
 }
 
 /**

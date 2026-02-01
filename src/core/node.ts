@@ -5,11 +5,16 @@ let nodeCounter = 0;
 /**
  * Generate a deterministic node ID from file path and symbol name,
  * or a unique ID if no qualified name is available.
+ *
+ * V8-optimized: uses hex encoding (toString(16)) which is faster than
+ * base-36 (toString(36)) in V8's number-to-string fast path.
+ * Counter alone ensures uniqueness within a process; timestamp adds
+ * cross-process uniqueness.
  */
 function generateNodeId(input: CreateNodeInput): string {
   if (input.id) return input.id;
   if (input.qualifiedName) return input.qualifiedName;
-  return `node_${++nodeCounter}_${Date.now().toString(36)}`;
+  return `node_${++nodeCounter}_${(Date.now() & 0xffffffff).toString(16)}`;
 }
 
 /**
