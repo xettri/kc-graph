@@ -4,7 +4,7 @@
   "description": "AI-optimized code intelligence graph — maps codebases at module/function/variable level for token-efficient AI context retrieval",
   "repository": {
     "type": "git",
-    "url": "https://github.com/xettri/kc-graph.git"
+    "url": "git+https://github.com/xettri/kc-graph.git"
   },
   "bugs": {
     "url": "https://github.com/xettri/kc-graph/issues"
@@ -27,7 +27,7 @@
     }
   },
   "bin": {
-    "kc-graph": "./dist/cjs/cli/cli.js"
+    "kc-graph": "dist/cjs/cli/cli.js"
   },
   "files": [
     "dist",
