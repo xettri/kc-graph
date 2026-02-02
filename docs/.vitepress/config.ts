@@ -44,6 +44,10 @@ export default defineConfig({
       ],
       '/examples/': [
         {
+          text: 'Setup Guides',
+          items: [{ text: 'Claude Code Setup', link: '/examples/claude-code-setup' }],
+        },
+        {
           text: 'Examples',
           items: [
             { text: 'Basic Usage', link: '/examples/basic-usage' },

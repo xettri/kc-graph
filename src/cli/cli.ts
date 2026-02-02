@@ -7,6 +7,8 @@ import { resolveStore, loadAllGlobalProjects } from '../storage/resolver.js';
 import { startMcpServer } from '../mcp/server.js';
 import { singleProject } from '../mcp/tools.js';
 import { startViewer } from './viewer.js';
+import { runWatch } from './watch.js';
+import { runStatus } from './status.js';
 
 function getVersion(): string {
   let curr = typeof __dirname !== 'undefined' ? __dirname : process.cwd();
@@ -91,6 +93,8 @@ Usage:
 Commands:
   init          Index a project and create the knowledge graph
   sync          Update an existing graph (re-index changed files, remove deleted)
+  watch         Watch for file changes and auto-sync the graph
+  status        Show project graph status, staleness, and health metrics
   view          Open interactive graph visualization in browser
   mcp           Start MCP stdio server (for AI agent integration)
   setup         Print MCP config snippet for Claude Code / Cursor
@@ -110,6 +114,8 @@ Examples:
   kc-graph init                     Index current directory
   kc-graph init ./my-project -g     Index and store globally
   kc-graph sync                     Update the graph for current directory
+  kc-graph watch                    Watch for changes and auto-sync
+  kc-graph status                   Show graph health and staleness
   kc-graph view                     Open graph viewer in browser
   kc-graph mcp                      Start MCP server for current project
   kc-graph mcp --global             Start MCP server for all global projects
@@ -345,6 +351,12 @@ async function main(): Promise<void> {
     case 'sync':
     case 'update':
       await runSync(args);
+      break;
+    case 'watch':
+      await runWatch(args);
+      break;
+    case 'status':
+      runStatus(args);
       break;
     case 'view':
       await runView(args);

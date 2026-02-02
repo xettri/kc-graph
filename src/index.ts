@@ -29,6 +29,10 @@ export { analyzeImpact, formatImpactSummary } from './operations/impact.js';
 export type { ImpactOptions } from './operations/impact.js';
 export { extractSubgraph, getFileStructure } from './operations/subgraph.js';
 export type { SubgraphOptions } from './operations/subgraph.js';
+export { findUnused, formatUnusedSummary } from './operations/unused.js';
+export type { UnusedSymbol, FindUnusedOptions } from './operations/unused.js';
+export { reviewChanges, formatReviewSummary } from './operations/review.js';
+export type { ReviewResult, ChangeInfo, ImpactSummary } from './operations/review.js';
 
 // AI
 export { buildContext, getContextForSymbol, getContextForFile } from './ai/context-builder.js';
@@ -91,3 +95,11 @@ export type { ToolResult, ProjectMap, ProjectEntry } from './mcp/tools.js';
 // Viewer
 export { startViewer, exportViewerHTML } from './cli/viewer.js';
 export type { ViewerOptions } from './cli/viewer.js';
+
+// Watch
+export { startWatch } from './cli/watch.js';
+export type { WatchOptions } from './cli/watch.js';
+
+// Status
+export { getProjectStatus } from './cli/status.js';
+export type { StatusInfo } from './cli/status.js';

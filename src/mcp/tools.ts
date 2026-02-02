@@ -4,6 +4,8 @@ import { getContextForSymbol, getContextForFile } from '../ai/context-builder.js
 import { analyzeImpact, formatImpactSummary } from '../operations/impact.js';
 import { findSimilar } from '../ai/embeddings.js';
 import { query } from '../operations/query.js';
+import { findUnused, formatUnusedSummary } from '../operations/unused.js';
+import { reviewChanges, formatReviewSummary } from '../operations/review.js';
 
 export interface ProjectEntry {
   graph: CodeGraph;
@@ -122,6 +124,47 @@ export const toolDefinitions = {
       required: ['symbol'],
     },
   },
+  review_changes: {
+    name: 'review_changes',
+    description:
+      'Analyze changed files — detect modified symbols, trace impact, and build review-focused context',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        files: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'File paths that were changed',
+        },
+        maxTokens: {
+          type: 'number',
+          description: 'Maximum token budget for context (default: 8000)',
+          default: 8000,
+        },
+        project: projectParam,
+      },
+      required: ['files'],
+    },
+  },
+
+  find_unused: {
+    name: 'find_unused',
+    description:
+      'Find potentially unused code — functions, variables, types with no callers or importers',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        path: { type: 'string', description: 'Scope analysis to a directory path' },
+        type: {
+          type: 'string',
+          enum: ['function', 'class', 'variable', 'type'],
+          description: 'Filter by symbol type',
+        },
+        project: projectParam,
+      },
+      required: [],
+    },
+  },
 } as const;
 
 export interface ToolResult {
@@ -139,6 +182,8 @@ export function createToolHandlers(
     get_impact: (args) => handleGetImpact(projects, args),
     get_structure: (args) => handleGetStructure(projects, args),
     find_similar: (args) => handleFindSimilar(projects, args),
+    review_changes: (args) => handleReviewChanges(projects, args),
+    find_unused: (args) => handleFindUnused(projects, args),
   };
 }
 
@@ -389,6 +434,83 @@ function handleFindSimilar(projects: ProjectMap, args: Record<string, unknown>):
   return {
     content: [{ type: 'text', text: `Symbol not found: ${symbol}` }],
     isError: true,
+  };
+}
+
+function handleReviewChanges(projects: ProjectMap, args: Record<string, unknown>): ToolResult {
+  const files = args['files'] as string[];
+  const maxTokens = (args['maxTokens'] as number) || 8000;
+  const projectFilter = args['project'] as string | undefined;
+
+  if (!files || files.length === 0) {
+    return {
+      content: [{ type: 'text', text: 'Error: provide at least one file path in "files"' }],
+      isError: true,
+    };
+  }
+
+  const targets = resolveProjects(projects, projectFilter);
+  if (targets.length === 0) {
+    return {
+      content: [{ type: 'text', text: `Project not found: ${projectFilter}` }],
+      isError: true,
+    };
+  }
+
+  const multiProject = projects.size > 1 && !projectFilter;
+
+  for (const [name, entry] of targets) {
+    // Check if any of the files exist in this project's graph
+    const hasFiles = files.some((f) => entry.graph.findByFile(f).length > 0);
+    if (!hasFiles) continue;
+
+    const result = reviewChanges(entry.graph, files, maxTokens);
+    const summary = formatReviewSummary(result);
+    const prefix = projectPrefix(name, multiProject);
+
+    return {
+      content: [{ type: 'text', text: prefix + summary }],
+    };
+  }
+
+  return {
+    content: [{ type: 'text', text: `No indexed files found matching: ${files.join(', ')}` }],
+    isError: true,
+  };
+}
+
+function handleFindUnused(projects: ProjectMap, args: Record<string, unknown>): ToolResult {
+  const pathFilter = args['path'] as string | undefined;
+  const typeFilter = args['type'] as NodeType | undefined;
+  const projectFilter = args['project'] as string | undefined;
+
+  const targets = resolveProjects(projects, projectFilter);
+  if (targets.length === 0) {
+    return {
+      content: [{ type: 'text', text: `Project not found: ${projectFilter}` }],
+      isError: true,
+    };
+  }
+
+  const multiProject = projects.size > 1 && !projectFilter;
+  const allSections: string[] = [];
+
+  for (const [name, entry] of targets) {
+    const results = findUnused(entry.graph, { path: pathFilter, type: typeFilter });
+    if (results.length === 0) continue;
+
+    const prefix = projectPrefix(name, multiProject);
+    allSections.push(prefix + formatUnusedSummary(results));
+  }
+
+  if (allSections.length === 0) {
+    return {
+      content: [{ type: 'text', text: 'No unused symbols found.' }],
+    };
+  }
+
+  return {
+    content: [{ type: 'text', text: allSections.join('\n\n') }],
   };
 }
 

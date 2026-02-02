@@ -129,7 +129,7 @@ describe('MCP Server Protocol', () => {
       method: 'tools/list',
     }) as any;
 
-    expect(resp.result.tools.length).toBe(6);
+    expect(resp.result.tools.length).toBe(8);
     const names = resp.result.tools.map((t: any) => t.name);
     expect(names).toContain('list_projects');
     expect(names).toContain('search_code');
@@ -137,6 +137,8 @@ describe('MCP Server Protocol', () => {
     expect(names).toContain('get_impact');
     expect(names).toContain('get_structure');
     expect(names).toContain('find_similar');
+    expect(names).toContain('review_changes');
+    expect(names).toContain('find_unused');
   });
 
   it('should have valid input schemas for each tool', () => {

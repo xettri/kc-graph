@@ -127,8 +127,25 @@ kc-graph setup
 
 Prints the config snippet for Claude Code, Cursor, and other MCP clients.
 
+### 10. Watch for Changes
+
+```bash
+kc-graph watch
+```
+
+Automatically detects file changes and re-syncs the graph. Runs in the foreground — start it in a separate terminal.
+
+### 11. Check Graph Health
+
+```bash
+kc-graph status
+```
+
+Shows: last sync time, staleness (changed files since sync), node/edge counts, most connected symbols, and storage size.
+
 ## Next Steps
 
+- [Claude Code Setup](/examples/claude-code-setup) — complete end-to-end MCP walkthrough
 - [Core Concepts](/guide/core-concepts) — understand nodes, edges, and the graph model
 - [Parsing & Indexing](/guide/parsing) — call extraction, arrow functions, import resolution
 - [AI Context Builder](/guide/ai-context) — token-budget-aware retrieval

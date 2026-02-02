@@ -75,6 +75,8 @@ Run `kc-graph setup` to get the config snippet.
 | `get_impact` | Change impact analysis | `{ symbol, file?, maxDepth?, project? }` |
 | `get_structure` | File structure overview | `{ path, project? }` |
 | `find_similar` | Find semantically similar code | `{ symbol, file?, limit?, project? }` |
+| `review_changes` | Analyze changed files — impact + context | `{ files, maxTokens?, project? }` |
+| `find_unused` | Find dead code with no callers | `{ path?, type?, project? }` |
 
 All tools accept an optional `project` parameter in multi-project mode to scope queries.
 
@@ -114,9 +116,14 @@ Instead of the AI reading entire files to understand your code, kc-graph provide
 ## Keeping the Graph Updated
 
 ```bash
-# Sync on file changes (only re-indexes changed files)
+# Manual sync (only re-indexes changed files)
 kc-graph sync
+
+# Watch mode — auto-syncs when files change (recommended)
+kc-graph watch
 ```
+
+Watch mode uses file system events with debouncing to keep the graph fresh as you edit code. Start it in a separate terminal and forget about it.
 
 Or programmatically:
 
