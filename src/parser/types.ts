@@ -22,6 +22,7 @@ export interface ParsedEdgeInfo {
   sourceQualifiedName: string;
   targetQualifiedName: string;
   type: 'contains' | 'calls' | 'imports' | 'extends' | 'implements' | 'references' | 'exports';
+  metadata?: Record<string, unknown>;
 }
 
 export interface ParserOptions {
