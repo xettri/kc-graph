@@ -43,7 +43,8 @@ export function startMcpServer(projects: ProjectMap): void {
         const message = JSON.parse(body);
         handleMessage(message);
       } catch {
-        // Malformed JSON — skip
+        // Malformed JSON — send parse error per JSON-RPC spec
+        sendError(null, -32700, 'Parse error: invalid JSON');
       }
     }
   }
@@ -122,7 +123,7 @@ export function startMcpServer(projects: ProjectMap): void {
     send({ jsonrpc: '2.0', id, result });
   }
 
-  function sendError(id: number | string | undefined, code: number, message: string): void {
+  function sendError(id: number | string | null | undefined, code: number, message: string): void {
     if (id === undefined) return;
     send({ jsonrpc: '2.0', id, error: { code, message } });
   }

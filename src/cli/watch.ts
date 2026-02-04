@@ -63,7 +63,7 @@ export function startWatch(options: WatchOptions = {}): { close: () => void } {
       syncing = false;
       if (pendingSync) {
         pendingSync = false;
-        runSync();
+        void runSync().catch((err) => options.onError?.(err as Error));
       }
     }
   };
@@ -72,7 +72,7 @@ export function startWatch(options: WatchOptions = {}): { close: () => void } {
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
       debounceTimer = null;
-      runSync();
+      void runSync().catch((err) => options.onError?.(err as Error));
     }, debounceMs);
   };
 

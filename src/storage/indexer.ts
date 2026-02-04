@@ -1,4 +1,5 @@
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+import { stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { CodeGraph } from '../core/graph.js';
 import { indexSourceFile } from '../parser/typescript-parser.js';
@@ -110,22 +111,32 @@ export async function syncProject(options: IndexOptions = {}): Promise<SyncResul
   const newFiles: string[] = [];
   const deletedFiles: string[] = [];
 
-  // Find changed and new files
+  // Batch stat all files that exist in the map (async for non-blocking I/O)
+  const filesToStat: Array<{
+    file: (typeof discoveredFiles)[0];
+    existing: (typeof map.files)[string];
+  }> = [];
   for (const file of discoveredFiles) {
     const existing = map.files[file.relativePath];
     if (!existing) {
       newFiles.push(file.relativePath);
     } else {
-      // Check mtime
-      try {
-        const stat = statSync(file.absolutePath);
-        const currentMtime = Math.floor(stat.mtimeMs);
-        if (currentMtime !== existing.mtime) {
-          changedFiles.push(file.relativePath);
-        }
-      } catch {
-        changedFiles.push(file.relativePath);
-      }
+      filesToStat.push({ file, existing });
+    }
+  }
+
+  const statResults = await Promise.all(
+    filesToStat.map(({ file }) =>
+      stat(file.absolutePath)
+        .then((s) => Math.floor(s.mtimeMs))
+        .catch(() => -1),
+    ),
+  );
+
+  for (let i = 0; i < filesToStat.length; i++) {
+    const currentMtime = statResults[i]!;
+    if (currentMtime === -1 || currentMtime !== filesToStat[i]!.existing.mtime) {
+      changedFiles.push(filesToStat[i]!.file.relativePath);
     }
   }
 

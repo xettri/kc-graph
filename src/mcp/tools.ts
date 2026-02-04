@@ -215,10 +215,11 @@ function handleListProjects(projects: ProjectMap): ToolResult {
 }
 
 function handleSearchCode(projects: ProjectMap, args: Record<string, unknown>): ToolResult {
-  const searchQuery = args['query'] as string;
-  const typeFilter = args['type'] as NodeType | undefined;
-  const fileFilter = args['file'] as string | undefined;
-  const projectFilter = args['project'] as string | undefined;
+  const searchQuery = requireString(args, 'query');
+  if (typeof searchQuery !== 'string') return searchQuery;
+  const typeFilter = optionalString(args, 'type') as NodeType | undefined;
+  const fileFilter = optionalString(args, 'file');
+  const projectFilter = optionalString(args, 'project');
 
   const targets = resolveProjects(projects, projectFilter);
   if (targets.length === 0) {
@@ -261,10 +262,10 @@ function handleSearchCode(projects: ProjectMap, args: Record<string, unknown>): 
 }
 
 function handleGetContext(projects: ProjectMap, args: Record<string, unknown>): ToolResult {
-  const symbol = args['symbol'] as string | undefined;
-  const file = args['file'] as string | undefined;
-  const maxTokens = (args['maxTokens'] as number) || 4000;
-  const projectFilter = args['project'] as string | undefined;
+  const symbol = optionalString(args, 'symbol');
+  const file = optionalString(args, 'file');
+  const maxTokens = optionalNumber(args, 'maxTokens', 4000);
+  const projectFilter = optionalString(args, 'project');
 
   const targets = resolveProjects(projects, projectFilter);
   if (targets.length === 0) {
@@ -305,10 +306,11 @@ function handleGetContext(projects: ProjectMap, args: Record<string, unknown>): 
 }
 
 function handleGetImpact(projects: ProjectMap, args: Record<string, unknown>): ToolResult {
-  const symbol = args['symbol'] as string;
-  const file = args['file'] as string | undefined;
-  const maxDepth = (args['maxDepth'] as number) || 5;
-  const projectFilter = args['project'] as string | undefined;
+  const symbol = requireString(args, 'symbol');
+  if (typeof symbol !== 'string') return symbol;
+  const file = optionalString(args, 'file');
+  const maxDepth = optionalNumber(args, 'maxDepth', 5);
+  const projectFilter = optionalString(args, 'project');
 
   const targets = resolveProjects(projects, projectFilter);
   if (targets.length === 0) {
@@ -340,8 +342,9 @@ function handleGetImpact(projects: ProjectMap, args: Record<string, unknown>): T
 }
 
 function handleGetStructure(projects: ProjectMap, args: Record<string, unknown>): ToolResult {
-  const path = args['path'] as string;
-  const projectFilter = args['project'] as string | undefined;
+  const path = requireString(args, 'path');
+  if (typeof path !== 'string') return path;
+  const projectFilter = optionalString(args, 'project');
 
   const targets = resolveProjects(projects, projectFilter);
   if (targets.length === 0) {
@@ -389,10 +392,11 @@ function handleGetStructure(projects: ProjectMap, args: Record<string, unknown>)
 }
 
 function handleFindSimilar(projects: ProjectMap, args: Record<string, unknown>): ToolResult {
-  const symbol = args['symbol'] as string;
-  const file = args['file'] as string | undefined;
-  const limit = (args['limit'] as number) || 10;
-  const projectFilter = args['project'] as string | undefined;
+  const symbol = requireString(args, 'symbol');
+  if (typeof symbol !== 'string') return symbol;
+  const file = optionalString(args, 'file');
+  const limit = optionalNumber(args, 'limit', 10);
+  const projectFilter = optionalString(args, 'project');
 
   const targets = resolveProjects(projects, projectFilter);
   if (targets.length === 0) {
@@ -438,9 +442,9 @@ function handleFindSimilar(projects: ProjectMap, args: Record<string, unknown>):
 }
 
 function handleReviewChanges(projects: ProjectMap, args: Record<string, unknown>): ToolResult {
-  const files = args['files'] as string[];
-  const maxTokens = (args['maxTokens'] as number) || 8000;
-  const projectFilter = args['project'] as string | undefined;
+  const files = Array.isArray(args['files']) ? (args['files'] as string[]) : null;
+  const maxTokens = optionalNumber(args, 'maxTokens', 8000);
+  const projectFilter = optionalString(args, 'project');
 
   if (!files || files.length === 0) {
     return {
@@ -480,9 +484,9 @@ function handleReviewChanges(projects: ProjectMap, args: Record<string, unknown>
 }
 
 function handleFindUnused(projects: ProjectMap, args: Record<string, unknown>): ToolResult {
-  const pathFilter = args['path'] as string | undefined;
-  const typeFilter = args['type'] as NodeType | undefined;
-  const projectFilter = args['project'] as string | undefined;
+  const pathFilter = optionalString(args, 'path');
+  const typeFilter = optionalString(args, 'type') as NodeType | undefined;
+  const projectFilter = optionalString(args, 'project');
 
   const targets = resolveProjects(projects, projectFilter);
   if (targets.length === 0) {
@@ -516,4 +520,30 @@ function handleFindUnused(projects: ProjectMap, args: Record<string, unknown>): 
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function requireString(args: Record<string, unknown>, key: string): string | ToolResult {
+  const val = args[key];
+  if (typeof val !== 'string' || val.length === 0) {
+    return {
+      content: [
+        { type: 'text', text: `Invalid or missing parameter: "${key}" must be a non-empty string` },
+      ],
+      isError: true,
+    };
+  }
+  return val;
+}
+
+function optionalString(args: Record<string, unknown>, key: string): string | undefined {
+  const val = args[key];
+  if (val === undefined || val === null) return undefined;
+  return typeof val === 'string' ? val : String(val);
+}
+
+function optionalNumber(args: Record<string, unknown>, key: string, fallback: number): number {
+  const val = args[key];
+  if (val === undefined || val === null) return fallback;
+  const num = typeof val === 'number' ? val : Number(val);
+  return isFinite(num) ? num : fallback;
 }

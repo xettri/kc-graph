@@ -110,7 +110,7 @@ export function resolveModulePath(fromFile: string, specifier: string): string {
   for (const part of parts) {
     if (part === '.' || part === '') continue;
     if (part === '..') {
-      resolved.pop();
+      if (resolved.length > 0) resolved.pop();
     } else {
       resolved.push(part);
     }

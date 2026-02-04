@@ -51,12 +51,21 @@ export function findUnused(graph: CodeGraph, options: FindUnusedOptions = {}): U
   const excludePatterns = options.excludePatterns ?? DEFAULT_EXCLUDE_PATTERNS;
   const results: UnusedSymbol[] = [];
 
-  const isEntryPointFile = (filePath: string): boolean => {
+  // Pre-compute the set of entry point file paths for O(1) lookup
+  const entryPointFiles = new Set<string>();
+  for (const node of graph.allNodes()) {
+    if (!node.location) continue;
+    const file = node.location.file;
+    if (entryPointFiles.has(file)) continue;
     for (const pattern of excludePatterns) {
-      if (filePath.endsWith('/' + pattern) || filePath === pattern) return true;
+      if (file.endsWith('/' + pattern) || file === pattern) {
+        entryPointFiles.add(file);
+        break;
+      }
     }
-    return false;
-  };
+  }
+
+  const isEntryPointFile = (filePath: string): boolean => entryPointFiles.has(filePath);
 
   const isExported = (node: CodeNode): boolean => {
     const inEdges = graph.getInEdges(node.id, ['exports']);

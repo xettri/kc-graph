@@ -72,16 +72,32 @@ export class ChunkStore {
   // -------------------------------------------------------------------------
 
   readMeta(): StorageMeta {
-    return JSON.parse(readFileSync(join(this.storagePath, META_FILE), 'utf-8'));
+    try {
+      return JSON.parse(readFileSync(join(this.storagePath, META_FILE), 'utf-8'));
+    } catch (err) {
+      throw new Error(
+        `Failed to read storage metadata at ${this.storagePath}: ${(err as Error).message}`,
+      );
+    }
   }
 
   readMap(): StorageMap {
-    return JSON.parse(readFileSync(join(this.storagePath, MAP_FILE), 'utf-8'));
+    try {
+      return JSON.parse(readFileSync(join(this.storagePath, MAP_FILE), 'utf-8'));
+    } catch (err) {
+      throw new Error(
+        `Failed to read storage map at ${this.storagePath}: ${(err as Error).message}`,
+      );
+    }
   }
 
   readChunk(chunkId: string): ChunkData {
     const path = join(this.storagePath, CHUNKS_DIR, `${chunkId}.json`);
-    return JSON.parse(readFileSync(path, 'utf-8'));
+    try {
+      return JSON.parse(readFileSync(path, 'utf-8'));
+    } catch (err) {
+      throw new Error(`Failed to read chunk ${chunkId}: ${(err as Error).message}`);
+    }
   }
 
   /** Load the full graph from all chunks into a CodeGraph. */
@@ -200,6 +216,12 @@ export class ChunkStore {
       files.push(filePath);
     }
 
+    // Pre-compute file stats (avoids repeated sync I/O inside the chunking loop)
+    const fileStats = new Map<string, { mtime: number; size: number }>();
+    for (const file of nodesByFile.keys()) {
+      fileStats.set(file, this.safeFileStat(projectPath, file));
+    }
+
     // Build edges index: source node → edges
     const edgesBySource = new Map<string, CodeEdge[]>();
     for (const edge of graph.allEdges()) {
@@ -238,12 +260,8 @@ export class ChunkStore {
 
         map.chunks[chunkId] = { size, nodes: chunk.nodes.length, edges: chunk.edges.length };
         for (const file of files) {
-          const fileStat = this.safeFileStat(projectPath, file);
-          map.files[file] = {
-            mtime: fileStat.mtime,
-            size: fileStat.size,
-            chunks: [chunkId],
-          };
+          const fs = fileStats.get(file) ?? { mtime: 0, size: 0 };
+          map.files[file] = { mtime: fs.mtime, size: fs.size, chunks: [chunkId] };
         }
       } else {
         // Too big — split per file, then by symbol if needed
@@ -257,13 +275,9 @@ export class ChunkStore {
             }
           }
 
-          const fileChunkIds = this.writeNodesSplit(fileNodes, fileEdges, map);
-          const fileStat = this.safeFileStat(projectPath, file);
-          map.files[file] = {
-            mtime: fileStat.mtime,
-            size: fileStat.size,
-            chunks: fileChunkIds,
-          };
+          const fileChunkIds = this.writeNodesSplit(fileNodes, fileEdges, map, edgesBySource);
+          const fs = fileStats.get(file) ?? { mtime: 0, size: 0 };
+          map.files[file] = { mtime: fs.mtime, size: fs.size, chunks: fileChunkIds };
         }
       }
     }
@@ -290,18 +304,25 @@ export class ChunkStore {
    * Split nodes into chunks respecting size threshold.
    * Returns array of chunk IDs written.
    */
-  private writeNodesSplit(nodes: CodeNode[], edges: CodeEdge[], map: StorageMap): string[] {
+  private writeNodesSplit(
+    nodes: CodeNode[],
+    edges: CodeEdge[],
+    map: StorageMap,
+    edgesByNode?: Map<string, CodeEdge[]>,
+  ): string[] {
     const chunkIds: string[] = [];
 
-    // Build edge index: source node → edges
-    const edgesByNode = new Map<string, CodeEdge[]>();
-    for (const edge of edges) {
-      let list = edgesByNode.get(edge.source);
-      if (!list) {
-        list = [];
-        edgesByNode.set(edge.source, list);
+    // Reuse caller's edge index when available, otherwise build from local edges
+    if (!edgesByNode) {
+      edgesByNode = new Map<string, CodeEdge[]>();
+      for (const edge of edges) {
+        let list = edgesByNode.get(edge.source);
+        if (!list) {
+          list = [];
+          edgesByNode.set(edge.source, list);
+        }
+        list.push(edge);
       }
-      list.push(edge);
     }
 
     // Group by top-level parent (class/namespace) for logical splitting

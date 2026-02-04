@@ -44,7 +44,8 @@ export function extractImportsExports(
   // ---------------------------------------------------------------------------
 
   function handleImport(node: import('typescript').ImportDeclaration) {
-    const moduleSpecifier = (node.moduleSpecifier as import('typescript').StringLiteral).text;
+    if (!ts.isStringLiteral(node.moduleSpecifier)) return;
+    const moduleSpecifier = node.moduleSpecifier.text;
     const resolvedModule = resolveModulePath(filePath, moduleSpecifier);
 
     // File-level import edge
@@ -94,8 +95,8 @@ export function extractImportsExports(
   // ---------------------------------------------------------------------------
 
   function handleExportDeclaration(node: import('typescript').ExportDeclaration) {
-    if (node.moduleSpecifier) {
-      const moduleSpecifier = (node.moduleSpecifier as import('typescript').StringLiteral).text;
+    if (node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) {
+      const moduleSpecifier = node.moduleSpecifier.text;
       const resolvedModule = resolveModulePath(filePath, moduleSpecifier);
 
       if (node.exportClause && ts.isNamedExports(node.exportClause)) {
