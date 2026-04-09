@@ -35,6 +35,7 @@ export default defineConfig({
             { text: 'Querying & Traversal', link: '/guide/querying' },
             { text: 'AI Context Builder', link: '/guide/ai-context' },
             { text: 'Claude Code Integration', link: '/guide/claude-code' },
+            { text: 'Scoped Environments', link: '/guide/scopes' },
           ],
         },
         {

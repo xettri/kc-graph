@@ -57,6 +57,19 @@ Then add to your Claude Code settings (`~/.claude/settings.json`):
 }
 ```
 
+Or add a `.mcp.json` to your project root (preferred for per-project config):
+
+```json
+{
+  "mcpServers": {
+    "kc-graph": {
+      "command": "kc-graph",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
 Restart Claude Code to load the MCP server.
 
 ## Step 4: Verify It Works
@@ -206,6 +219,37 @@ Claude calls `get_impact` with `{ symbol: "validate", project: "api-server" }`.
 | `review_changes` | Analyze changed files with impact + context |
 | `find_unused` | Find dead code (no callers/importers) |
 
+## Using Scopes
+
+If you work across multiple environments (develop, staging, prod), scopes keep your graphs isolated:
+
+```bash
+# Set active scope
+kc-graph scope use develop
+
+# Index projects into that scope
+kc-graph init --global ~/work/api-server
+kc-graph init --global ~/work/frontend
+
+# Configure Claude Code for this scope
+kc-graph setup --scope develop
+```
+
+Then add to `.mcp.json` or `settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "kc-graph": {
+      "command": "kc-graph",
+      "args": ["mcp", "--global", "--scope", "develop"]
+    }
+  }
+}
+```
+
+See the full [Scoped Environments](/guide/scopes) guide for details.
+
 ## Tips
 
 - **Use `watch` mode** during development so the graph stays fresh
@@ -213,3 +257,4 @@ Claude calls `get_impact` with `{ symbol: "validate", project: "api-server" }`.
 - **Use `get_context`** when Claude needs to understand surrounding code
 - **Use `review_changes`** for code review — it focuses on the blast radius
 - **Multi-project mode** is great for microservice architectures
+- **Use scopes** to maintain separate graphs per branch/environment

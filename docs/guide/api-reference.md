@@ -183,6 +183,8 @@ import { ChunkStore, resolveStore, createStore, initProject, syncProject } from 
 await initProject({
   root: './my-project',       // Project directory
   global: false,              // Use global ~/.kc-graph/ storage
+  scope: 'develop',           // Scope name (optional)
+  force: false,               // Skip branch safety check (optional)
   config: { chunkSize: 262144 }, // Storage config overrides
   onProgress: (file, i, total) => { },
   onError: (file, error) => { },
@@ -215,12 +217,51 @@ import { toolDefinitions, createToolHandlers, singleProject, startMcpServer } fr
 
 | Export | Description |
 |--------|-------------|
-| `toolDefinitions` | MCP tool schemas (list_projects, search_code, get_context, get_impact, get_structure, find_similar) |
-| `createToolHandlers(projects)` | Create handler functions bound to a `ProjectMap` |
+| `toolDefinitions` | MCP tool schemas (8 tools: list_projects, search_code, get_context, get_impact, get_structure, find_similar, review_changes, find_unused) |
+| `createToolHandlers(projects, scope?)` | Create handler functions bound to a `ProjectMap` |
 | `singleProject(name, graph, path)` | Create a `ProjectMap` with one project |
-| `startMcpServer(projects)` | Start stdio MCP server (JSON-RPC over stdin/stdout) |
+| `startMcpServer(projects, scope?)` | Start stdio MCP server (JSON-RPC over stdin/stdout) |
 
 All tools accept an optional `project` parameter to scope queries to a specific project when running in multi-project mode.
+
+## Scope
+
+```typescript
+import {
+  resolveScope, validateScopeName, getActiveScope, setActiveScope,
+  resetActiveScope, listScopes, scopeExists, deleteScope,
+  ensureScopeDir, scopePath, detectGitBranch, DEFAULT_SCOPE,
+} from 'kc-graph';
+```
+
+| Function | Returns | Description |
+|----------|---------|-------------|
+| `resolveScope(explicit?)` | `string` | Resolve scope: flag > `KC_GRAPH_SCOPE` env > config > `"default"` |
+| `validateScopeName(name)` | `void` | Throw if name is invalid (`^[a-z][a-z0-9-]{0,49}$`) |
+| `getActiveScope()` | `string` | Read active scope from `config.json` |
+| `setActiveScope(scope)` | `void` | Write active scope to `config.json` |
+| `resetActiveScope()` | `void` | Reset active scope to `"default"` |
+| `listScopes(global, projectRoot?)` | `ScopeInfo[]` | List all scopes with project counts and last sync |
+| `scopeExists(scope, global, projectRoot?)` | `boolean` | Check if a scope directory exists |
+| `deleteScope(scope, global, projectRoot?)` | `void` | Delete a scope (cannot delete `"default"`) |
+| `ensureScopeDir(scope, global, projectRoot?)` | `string` | Create scope directory with `scope.json` (idempotent) |
+| `scopePath(scope, global, projectRoot?)` | `string` | Get base path for a scope's storage |
+| `detectGitBranch(projectRoot)` | `string \| null` | Detect current git branch (null if not a git repo) |
+| `DEFAULT_SCOPE` | `"default"` | The default scope name constant |
+
+### ScopeInfo
+
+```typescript
+interface ScopeInfo {
+  name: string;        // Scope name
+  projectCount: number; // Number of projects in this scope
+  lastSync: number;     // Most recent sync timestamp (ms)
+  createdAt: number;    // When scope was created (ms)
+  active: boolean;      // Whether this is the active scope
+}
+```
+
+See [Scoped Environments](/guide/scopes) for the full guide.
 
 ## Viewer
 

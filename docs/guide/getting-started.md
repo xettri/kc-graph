@@ -150,3 +150,4 @@ Shows: last sync time, staleness (changed files since sync), node/edge counts, m
 - [Parsing & Indexing](/guide/parsing) — call extraction, arrow functions, import resolution
 - [AI Context Builder](/guide/ai-context) — token-budget-aware retrieval
 - [Claude Code Integration](/guide/claude-code) — MCP server setup
+- [Scoped Environments](/guide/scopes) — isolated graphs per branch/environment
