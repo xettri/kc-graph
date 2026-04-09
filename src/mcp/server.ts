@@ -4,10 +4,24 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprot
 import { createToolHandlers, toolDefinitions } from './tools.js';
 import type { ProjectMap } from './tools.js';
 import { DEFAULT_SCOPE } from '../storage/scope.js';
+import { createRefresher } from './reload.js';
 
-/** Start MCP server using the official @modelcontextprotocol/sdk over stdio. */
-export async function startMcpServer(projects: ProjectMap, scope?: string): Promise<void> {
+export interface McpServerOptions {
+  scope?: string;
+  storePaths?: Map<string, string>;
+}
+
+/** Start MCP server over stdio. */
+export async function startMcpServer(
+  projects: ProjectMap,
+  options?: string | McpServerOptions,
+): Promise<void> {
+  const opts: McpServerOptions = typeof options === 'string' ? { scope: options } : (options ?? {});
+  const { scope, storePaths } = opts;
+
   const handlers = createToolHandlers(projects, scope);
+
+  const refresh = storePaths && storePaths.size > 0 ? createRefresher(projects, storePaths) : null;
 
   const serverName = scope && scope !== DEFAULT_SCOPE ? `kc-graph (${scope})` : 'kc-graph';
 
@@ -16,7 +30,6 @@ export async function startMcpServer(projects: ProjectMap, scope?: string): Prom
     { capabilities: { tools: {} } },
   );
 
-  // Use the underlying server for raw JSON Schema tool definitions (no Zod dependency)
   const server = mcpServer.server;
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -39,6 +52,8 @@ export async function startMcpServer(projects: ProjectMap, scope?: string): Prom
     }
 
     try {
+      refresh?.();
+
       const result = handler(args ?? {});
       return { ...result } as Record<string, unknown>;
     } catch (err) {

@@ -241,6 +241,24 @@ Instead of the AI reading entire files to understand your code, kc-graph provide
 3. AI calls `get_context` for each affected area
 4. AI updates all references across the codebase
 
+## Auto-Reload
+
+The MCP server detects when you run `kc-graph sync` and reloads the affected project's graph automatically. No restart needed.
+
+To disable this (for static/fixed graphs):
+
+```bash
+kc-graph mcp --global --no-reload
+```
+
+## Removing Projects
+
+```bash
+kc-graph remove ~/work/old-project --global --force
+```
+
+Deletes all indexed data and removes the project from the registry.
+
 ## Keeping the Graph Updated
 
 ```bash

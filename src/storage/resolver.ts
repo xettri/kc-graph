@@ -75,10 +75,7 @@ function getGlobalStore(
   const projectId = getProjectId(projectRoot);
   const projectDir = join(scopeDir, 'projects', projectId);
 
-  // Detect git branch for safety
   const branch = detectGitBranch(projectRoot);
-
-  // Update registry
   const registry = readRegistry(scopeDir);
   registry.projects[projectId] = {
     path: projectRoot,
@@ -176,7 +173,6 @@ export function removeProject(
     const projectId = getProjectId(root);
     const projectDir = join(scopeDir, 'projects', projectId);
 
-    // Read registry to get project name before removing
     const registry = readRegistry(scopeDir);
     const entry = registry.projects[projectId];
     if (!entry) {
@@ -184,19 +180,16 @@ export function removeProject(
     }
     const name = entry.name;
 
-    // Delete project storage
     if (existsSync(projectDir)) {
       rmSync(projectDir, { recursive: true, force: true });
     }
 
-    // Remove from registry
     delete registry.projects[projectId];
     writeRegistry(scopeDir, registry);
 
     return { storagePath: projectDir, name };
   }
 
-  // Local: delete the entire scope directory for this project
   const localPath = scopePath(scope, false, root);
   if (!existsSync(localPath) || !existsSync(join(localPath, 'meta.json'))) {
     throw new Error(`No local storage found at ${localPath}`);

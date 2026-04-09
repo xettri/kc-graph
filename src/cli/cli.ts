@@ -40,10 +40,6 @@ function getVersion(): string {
 
 const VERSION = getVersion();
 
-// ---------------------------------------------------------------------------
-// Argument parsing (no deps)
-// ---------------------------------------------------------------------------
-
 interface ParsedArgs {
   command: string;
   path: string;
@@ -54,6 +50,7 @@ interface ParsedArgs {
   port: number;
   scope: string | undefined;
   force: boolean;
+  noReload: boolean;
   subcommand: string | undefined;
 }
 
@@ -68,9 +65,9 @@ function parseArgs(argv: string[]): ParsedArgs {
   let port = 4242;
   let scope: string | undefined;
   let force = false;
+  let noReload = false;
   let subcommand: string | undefined;
 
-  // Track positional argument count for scope subcommand handling
   let positionalCount = 0;
 
   for (let i = 0; i < args.length; i++) {
@@ -86,6 +83,8 @@ function parseArgs(argv: string[]): ParsedArgs {
       global = true;
     } else if (arg === '--force' || arg === '-f') {
       force = true;
+    } else if (arg === '--no-reload') {
+      noReload = true;
     } else if (arg === '--scope' || arg === '-s') {
       if (i + 1 < args.length) {
         scope = args[++i]!;
@@ -102,26 +101,32 @@ function parseArgs(argv: string[]): ParsedArgs {
       if (positionalCount === 0) {
         command = arg;
       } else if (positionalCount === 1) {
-        // For 'scope' command, second positional is the subcommand
         if (command === 'scope') {
           subcommand = arg;
         } else {
           path = arg;
         }
       } else if (positionalCount === 2) {
-        // For 'scope' command, third positional is the scope name (stored as path)
         path = arg;
       }
       positionalCount++;
     }
   }
 
-  return { command, path, global, verbose, help, version, port, scope, force, subcommand };
+  return {
+    command,
+    path,
+    global,
+    verbose,
+    help,
+    version,
+    port,
+    scope,
+    force,
+    noReload,
+    subcommand,
+  };
 }
-
-// ---------------------------------------------------------------------------
-// Help text
-// ---------------------------------------------------------------------------
 
 function printHelp(): void {
   console.log(`
@@ -148,7 +153,8 @@ Options:
   -g, --global  Store graph in ~/.kc-graph/ instead of local .kc-graph/
                 For mcp: load all globally registered projects
   -s, --scope   Use a named scope (e.g., --scope feature-x)
-  -f, --force   Skip branch safety check on sync
+  -f, --force   Skip branch safety check on sync / confirm destructive ops
+  --no-reload   Disable auto-reload in MCP server (static mode)
   -P, --port    Port for the viewer server (default: 4242)
   -V, --verbose Show each file being indexed
   -h, --help    Show this help message
@@ -177,18 +183,10 @@ Scope management:
 `);
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 function scopePrefix(scope: string | undefined): string {
   const resolved = resolveScope(scope);
   return resolved !== 'default' ? `[scope: ${resolved}] ` : '';
 }
-
-// ---------------------------------------------------------------------------
-// Commands
-// ---------------------------------------------------------------------------
 
 async function runInit(args: ParsedArgs): Promise<void> {
   const root = resolve(args.path);
@@ -244,7 +242,6 @@ async function runInit(args: ParsedArgs): Promise<void> {
 async function runSync(args: ParsedArgs): Promise<void> {
   const prefix = scopePrefix(args.scope);
 
-  // Bulk sync: sync all globally registered projects in the scope
   if (args.global && args.path === '.') {
     const projects = listGlobalProjects(args.scope);
     if (projects.length === 0) {
@@ -384,11 +381,21 @@ async function runMcp(args: ParsedArgs): Promise<void> {
       process.stderr.write(`${prefix}  ${name}: ${n} nodes, ${e} edges\n`);
     }
 
+    const storePaths = new Map<string, string>();
+    for (const [name, entry] of projects) {
+      if ('store' in entry) {
+        storePaths.set(name, (entry as { store: { storagePath: string } }).store.storagePath);
+      }
+    }
+
     process.stderr.write(
       `${prefix}kc-graph MCP server started — ${projects.size} projects (${totalNodes} nodes, ${totalEdges} edges)\n`,
     );
 
-    startMcpServer(projects, args.scope);
+    startMcpServer(projects, {
+      scope: args.scope,
+      storePaths: args.noReload ? undefined : storePaths,
+    });
     return;
   }
 
@@ -411,11 +418,16 @@ async function runMcp(args: ParsedArgs): Promise<void> {
   const meta = store.readMeta();
   const name = basename(root);
 
+  const storePaths = new Map([[name, store.storagePath]]);
+
   process.stderr.write(
     `${prefix}kc-graph MCP server started — ${name} (${meta.stats.nodes} nodes, ${meta.stats.edges} edges)\n`,
   );
 
-  startMcpServer(singleProject(name, graph, root), args.scope);
+  startMcpServer(singleProject(name, graph, root), {
+    scope: args.scope,
+    storePaths: args.noReload ? undefined : storePaths,
+  });
 }
 
 function runSetup(args: ParsedArgs): void {
@@ -539,10 +551,6 @@ function runScope(args: ParsedArgs): void {
   console.error('Available: use, reset, list, delete');
   process.exit(1);
 }
-
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv);

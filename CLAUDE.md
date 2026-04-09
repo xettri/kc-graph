@@ -31,15 +31,23 @@ src/
 ## CLI Commands
 
 ```
-kc-graph init [path] [-g]     Index a project
-kc-graph sync [path] [-g]     Incremental update
-kc-graph view [--port 4242]   Browser graph visualization
-kc-graph mcp                  MCP server (single project from cwd)
-kc-graph mcp --global         MCP server (all globally registered projects)
-kc-graph setup                Print MCP config for Claude Code / Cursor
+kc-graph init [path] [-g] [-s <scope>]    Index a project
+kc-graph sync [path] [-g] [-s <scope>]    Incremental update (bulk if --global without path)
+kc-graph remove [path] [-g] [-s <scope>]  Remove indexed data (requires --force)
+kc-graph watch [-s <scope>]               Watch for file changes and auto-sync
+kc-graph status [-s <scope>]              Show graph health and staleness
+kc-graph view [--port 4242]               Browser graph visualization
+kc-graph mcp [-g] [-s <scope>]            MCP server (auto-reloads on sync)
+kc-graph mcp --global --no-reload         MCP server (static, no reload)
+kc-graph setup [-s <scope>]               Print MCP config for Claude Code / Cursor
+kc-graph scope                            Show active scope
+kc-graph scope use <name>                 Set active scope
+kc-graph scope reset                      Reset to default scope
+kc-graph scope list [--global]            List all scopes
+kc-graph scope delete <name> [--force]    Delete a scope
 ```
 
-## MCP Tools (6 total)
+## MCP Tools (8 total)
 
 All tools accept optional `project` param in multi-project mode.
 
@@ -51,6 +59,8 @@ All tools accept optional `project` param in multi-project mode.
 | `get_impact`    | Change impact analysis                       |
 | `get_structure` | File structure (classes, functions, exports) |
 | `find_similar`  | Semantic similarity (requires embeddings)    |
+| `review_changes`| Analyze changed files with impact + context  |
+| `find_unused`   | Find dead code (no callers/importers)        |
 
 ## Multi-Project MCP
 

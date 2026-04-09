@@ -143,6 +143,13 @@ kc-graph status
 
 Shows: last sync time, staleness (changed files since sync), node/edge counts, most connected symbols, and storage size.
 
+### 12. Remove a Project
+
+```bash
+kc-graph remove --force          # remove local
+kc-graph remove --global --force  # remove from global store
+```
+
 ## Next Steps
 
 - [Claude Code Setup](/examples/claude-code-setup) — complete end-to-end MCP walkthrough

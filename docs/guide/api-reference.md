@@ -173,6 +173,7 @@ import { ChunkStore, resolveStore, createStore, initProject, syncProject } from 
 |------------------|-------------|
 | `initProject(options?)` | Index a project from scratch (returns `SyncResult`) |
 | `syncProject(options?)` | Incremental sync — only re-index changed files |
+| `removeProject(projectRoot, options?)` | Remove indexed data and registry entry |
 | `resolveStore(projectRoot, options?)` | Find existing storage (local first, then global) |
 | `createStore(projectRoot, options?)` | Create new storage |
 | `ChunkStore` | Low-level chunked storage (init, saveGraph, loadGraph, syncFiles, cleanup) |
@@ -220,7 +221,7 @@ import { toolDefinitions, createToolHandlers, singleProject, startMcpServer } fr
 | `toolDefinitions` | MCP tool schemas (8 tools: list_projects, search_code, get_context, get_impact, get_structure, find_similar, review_changes, find_unused) |
 | `createToolHandlers(projects, scope?)` | Create handler functions bound to a `ProjectMap` |
 | `singleProject(name, graph, path)` | Create a `ProjectMap` with one project |
-| `startMcpServer(projects, scope?)` | Start stdio MCP server (JSON-RPC over stdin/stdout) |
+| `startMcpServer(projects, options?)` | Start stdio MCP server. Options: `{ scope?, storePaths? }` or scope string |
 
 All tools accept an optional `project` parameter to scope queries to a specific project when running in multi-project mode.
 

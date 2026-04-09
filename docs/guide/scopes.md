@@ -252,6 +252,33 @@ kc-graph mcp --global     # serves 'staging' scope
 
 `--scope` flag still takes highest priority if both are set.
 
+## Removing Projects
+
+Remove a project's indexed data from a scope:
+
+```bash
+# Remove local project
+kc-graph remove --force
+
+# Remove a specific global project
+kc-graph remove ~/work/api-gateway --global --scope develop --force
+
+# Remove entire scope (all projects)
+kc-graph scope delete develop --global --force
+```
+
+`--force` is required for both commands.
+
+## Static MCP Mode
+
+If your indexed projects are stable and won't change, disable the auto-reload check for zero overhead:
+
+```bash
+kc-graph mcp --global --no-reload
+```
+
+The MCP server loads graphs once at startup and never checks for updates. Use this in CI or when serving a fixed snapshot.
+
 ## Programmatic API
 
 All scope functions are exported from the `kc-graph` package:
