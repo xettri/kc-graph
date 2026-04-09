@@ -85,11 +85,18 @@ const ALWAYS_SKIP_DIRS = new Set([
   '.nuxt',
   '.output',
   '.cache',
+  'cache',
+  '.turbo',
+  '.parcel-cache',
   '__pycache__',
   '.tox',
   '.venv',
   'venv',
   '.kc-graph',
+  '.pnpm-store',
+  '.idea',
+  '.vscode',
+  '.DS_Store',
 ]);
 
 export interface DiscoveredFile {
@@ -114,15 +121,76 @@ export interface DiscoverOptions {
 
 /**
  * Discover all indexable files in a project.
- * Respects .gitignore, skips binaries and common non-source directories.
+ * Uses git ls-files in git repos (respects all gitignore rules).
+ * Falls back to manual walk with hardcoded skip list for non-git repos.
  */
 export function discoverFiles(options: DiscoverOptions = {}): DiscoveredFile[] {
   const root = resolve(options.root ?? process.cwd());
   const sourceExts = new Set([...SOURCE_EXTENSIONS, ...(options.extraSourceExtensions ?? [])]);
+  const includeUnknown = options.includeUnknown ?? false;
+
+  const gitFiles = tryGitLsFiles(root);
+  if (gitFiles) {
+    return classifyFiles(root, gitFiles, sourceExts, includeUnknown);
+  }
+
   const ignoreRules = loadGitignore(root, options.extraIgnore ?? []);
   const results: DiscoveredFile[] = [];
+  walk(root, root, sourceExts, ignoreRules, results, includeUnknown);
+  return results;
+}
 
-  walk(root, root, sourceExts, ignoreRules, results, options.includeUnknown ?? false);
+function tryGitLsFiles(root: string): string[] | null {
+  try {
+    const { execSync } = require('node:child_process');
+    const output = execSync('git ls-files --cached --others --exclude-standard', {
+      cwd: root,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      maxBuffer: 50 * 1024 * 1024,
+    });
+    return output.trim().split('\n').filter(Boolean);
+  } catch {
+    return null;
+  }
+}
+
+function classifyFiles(
+  root: string,
+  relativePaths: string[],
+  sourceExts: Set<string>,
+  includeUnknown: boolean,
+): DiscoveredFile[] {
+  const results: DiscoveredFile[] = [];
+
+  for (const relPath of relativePaths) {
+    const absPath = join(root, relPath);
+    const ext = extname(relPath).toLowerCase();
+
+    if (BINARY_EXTENSIONS.has(ext)) continue;
+
+    let stat;
+    try {
+      stat = statSync(absPath);
+    } catch {
+      continue;
+    }
+    if (!stat.isFile()) continue;
+    if (stat.size > 1_048_576) continue;
+
+    let kind: DiscoveredFile['kind'];
+    if (sourceExts.has(ext)) {
+      kind = 'source';
+    } else if (DOC_EXTENSIONS.has(ext)) {
+      kind = 'doc';
+    } else {
+      kind = 'unknown';
+      if (!includeUnknown) continue;
+    }
+
+    results.push({ absolutePath: absPath, relativePath: relPath, kind });
+  }
+
   return results;
 }
 

@@ -8,6 +8,7 @@ import {
   loadAllGlobalProjects,
   listGlobalProjects,
   removeProject,
+  getGlobalStoragePath,
 } from '../storage/resolver.js';
 import { startMcpServer } from '../mcp/server.js';
 import { singleProject } from '../mcp/tools.js';
@@ -339,15 +340,26 @@ async function runSync(args: ParsedArgs): Promise<void> {
 }
 
 async function runView(args: ParsedArgs): Promise<void> {
-  const root = resolve(args.path);
   const prefix = scopePrefix(args.scope);
+
+  if (args.global) {
+    const projects = loadAllGlobalProjects(args.scope);
+    if (projects.size === 0) {
+      console.error(`${prefix}No globally indexed projects found.`);
+      process.exit(1);
+    }
+    startViewer(projects, { port: args.port });
+    return;
+  }
+
+  const root = resolve(args.path);
 
   if (!existsSync(root)) {
     console.error(`${prefix}Error: directory not found: ${root}`);
     process.exit(1);
   }
 
-  const store = resolveStore(root, { global: args.global, scope: args.scope });
+  const store = resolveStore(root, { global: false, scope: args.scope });
 
   if (!store.exists()) {
     console.error(`No graph found for ${root}`);
@@ -381,20 +393,13 @@ async function runMcp(args: ParsedArgs): Promise<void> {
       process.stderr.write(`${prefix}  ${name}: ${n} nodes, ${e} edges\n`);
     }
 
-    const storePaths = new Map<string, string>();
-    for (const [name, entry] of projects) {
-      if ('store' in entry) {
-        storePaths.set(name, (entry as { store: { storagePath: string } }).store.storagePath);
-      }
-    }
-
     process.stderr.write(
       `${prefix}kc-graph MCP server started — ${projects.size} projects (${totalNodes} nodes, ${totalEdges} edges)\n`,
     );
 
     startMcpServer(projects, {
       scope: args.scope,
-      storePaths: args.noReload ? undefined : storePaths,
+      scopeDir: args.noReload ? undefined : getGlobalStoragePath(args.scope),
     });
     return;
   }
@@ -418,16 +423,11 @@ async function runMcp(args: ParsedArgs): Promise<void> {
   const meta = store.readMeta();
   const name = basename(root);
 
-  const storePaths = new Map([[name, store.storagePath]]);
-
   process.stderr.write(
     `${prefix}kc-graph MCP server started — ${name} (${meta.stats.nodes} nodes, ${meta.stats.edges} edges)\n`,
   );
 
-  startMcpServer(singleProject(name, graph, root), {
-    scope: args.scope,
-    storePaths: args.noReload ? undefined : storePaths,
-  });
+  startMcpServer(singleProject(name, graph, root), { scope: args.scope });
 }
 
 function runSetup(args: ParsedArgs): void {

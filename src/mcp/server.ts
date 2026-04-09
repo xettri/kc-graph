@@ -8,7 +8,8 @@ import { createRefresher } from './reload.js';
 
 export interface McpServerOptions {
   scope?: string;
-  storePaths?: Map<string, string>;
+  /** Scope directory path for auto-reload. Omit to disable. */
+  scopeDir?: string;
 }
 
 /** Start MCP server over stdio. */
@@ -17,11 +18,11 @@ export async function startMcpServer(
   options?: string | McpServerOptions,
 ): Promise<void> {
   const opts: McpServerOptions = typeof options === 'string' ? { scope: options } : (options ?? {});
-  const { scope, storePaths } = opts;
+  const { scope, scopeDir } = opts;
 
   const handlers = createToolHandlers(projects, scope);
 
-  const refresh = storePaths && storePaths.size > 0 ? createRefresher(projects, storePaths) : null;
+  const refresh = scopeDir ? createRefresher(projects, scopeDir) : null;
 
   const serverName = scope && scope !== DEFAULT_SCOPE ? `kc-graph (${scope})` : 'kc-graph';
 

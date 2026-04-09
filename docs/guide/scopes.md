@@ -252,6 +252,22 @@ kc-graph mcp --global     # serves 'staging' scope
 
 `--scope` flag still takes highest priority if both are set.
 
+## Viewing Scoped Graphs
+
+View a single project:
+
+```bash
+kc-graph view --scope develop
+```
+
+View all projects in a scope with a project switcher dropdown:
+
+```bash
+kc-graph view --global --scope develop
+```
+
+The viewer loads the first project and shows a dropdown in the sidebar to switch between projects. Switching fetches the graph on demand — no page reload needed.
+
 ## Removing Projects
 
 Remove a project's indexed data from a scope:

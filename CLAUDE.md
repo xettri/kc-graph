@@ -36,7 +36,7 @@ kc-graph sync [path] [-g] [-s <scope>]    Incremental update (bulk if --global w
 kc-graph remove [path] [-g] [-s <scope>]  Remove indexed data (requires --force)
 kc-graph watch [-s <scope>]               Watch for file changes and auto-sync
 kc-graph status [-s <scope>]              Show graph health and staleness
-kc-graph view [--port 4242]               Browser graph visualization
+kc-graph view [-g] [-s <scope>] [--port]   Browser graph visualization (multi-project with --global)
 kc-graph mcp [-g] [-s <scope>]            MCP server (auto-reloads on sync)
 kc-graph mcp --global --no-reload         MCP server (static, no reload)
 kc-graph setup [-s <scope>]               Print MCP config for Claude Code / Cursor
