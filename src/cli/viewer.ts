@@ -505,9 +505,14 @@ if(projectSelect){
       .then(function(r){ return r.json(); })
       .then(function(data){
         GRAPH = data;
-        initGraph(GRAPH);
-        document.title = 'kc-graph \\u2014 ' + name;
-        loading.classList.remove('show');
+        // Let browser paint the loading overlay before heavy work
+        requestAnimationFrame(function(){
+          setTimeout(function(){
+            initGraph(GRAPH);
+            document.title = 'kc-graph \\u2014 ' + name;
+            loading.classList.remove('show');
+          }, 0);
+        });
       })
       .catch(function(){
         loading.classList.remove('show');
