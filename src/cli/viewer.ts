@@ -26,42 +26,100 @@ interface CyEdge {
   };
 }
 
-function graphToCytoscape(graph: CodeGraph): { nodes: CyNode[]; edges: CyEdge[] } {
+interface CyData {
+  nodes: CyNode[];
+  edges: CyEdge[];
+}
+
+function getFileGroupMap(graph: CodeGraph): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const edge of graph.allEdges()) {
+    if (edge.type === 'contains') map.set(edge.target, edge.source);
+  }
+  return map;
+}
+
+function graphToFileLevel(graph: CodeGraph): CyData {
   const nodes: CyNode[] = [];
   const edges: CyEdge[] = [];
+  const fileIds = new Set<string>();
 
-  const fileGroupMap = new Map<string, string>();
-  for (const edge of graph.allEdges()) {
-    if (edge.type === 'contains') {
-      fileGroupMap.set(edge.target, edge.source);
+  for (const node of graph.allNodes()) {
+    if (node.type === 'file' || node.type === 'doc') {
+      fileIds.add(node.id);
+      nodes.push({
+        data: {
+          id: node.id,
+          label: node.name,
+          type: node.type,
+          file: node.location?.file ?? '',
+          line: node.location?.startLine ?? 0,
+          signature: node.signature,
+          content: '',
+          fileGroup: node.id,
+        },
+      });
     }
   }
 
+  for (const edge of graph.allEdges()) {
+    if (edge.type === 'contains') continue;
+    if (fileIds.has(edge.source) && fileIds.has(edge.target)) {
+      edges.push({
+        data: {
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          type: edge.type,
+          weight: edge.weight,
+        },
+      });
+    }
+  }
+
+  return { nodes, edges };
+}
+
+function getFileChildren(graph: CodeGraph, fileId: string): CyData {
+  const fileGroupMap = getFileGroupMap(graph);
+  const nodes: CyNode[] = [];
+  const edges: CyEdge[] = [];
+  const childIds = new Set<string>();
+
   for (const node of graph.allNodes()) {
-    nodes.push({
-      data: {
-        id: node.id,
-        label: node.name,
-        type: node.type,
-        file: node.location?.file ?? '',
-        line: node.location?.startLine ?? 0,
-        signature: node.signature,
-        content: node.content.length > 500 ? node.content.slice(0, 500) + '...' : node.content,
-        fileGroup: fileGroupMap.get(node.id) ?? node.id,
-      },
-    });
+    if (node.id === fileId) continue;
+    const group = fileGroupMap.get(node.id) ?? node.id;
+    if (group === fileId) {
+      childIds.add(node.id);
+      nodes.push({
+        data: {
+          id: node.id,
+          label: node.name,
+          type: node.type,
+          file: node.location?.file ?? '',
+          line: node.location?.startLine ?? 0,
+          signature: node.signature,
+          content: node.content.length > 500 ? node.content.slice(0, 500) + '...' : node.content,
+          fileGroup: fileId,
+        },
+      });
+    }
   }
 
   for (const edge of graph.allEdges()) {
-    edges.push({
-      data: {
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        type: edge.type,
-        weight: edge.weight,
-      },
-    });
+    const srcIsChild = childIds.has(edge.source);
+    const tgtIsChild = childIds.has(edge.target);
+    if (srcIsChild || tgtIsChild) {
+      edges.push({
+        data: {
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          type: edge.type,
+          weight: edge.weight,
+        },
+      });
+    }
   }
 
   return { nodes, edges };
@@ -97,6 +155,7 @@ interface ProjectInfo {
 function buildHTML(
   graphJSON: string,
   stats: { nodes: number; edges: number; files: number },
+  childCounts: string,
   projects?: ProjectInfo[],
   activeProject?: string,
 ): string {
@@ -118,8 +177,6 @@ ${cytoscapeScript}
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f1117;color:#d1d5db;overflow:hidden;display:flex;height:100vh}
-
-/* ---- Sidebar ---- */
 #sidebar{width:260px;min-width:260px;background:#161922;border-right:1px solid #2a2e3a;display:flex;flex-direction:column;z-index:10}
 #sidebar-header{padding:16px;border-bottom:1px solid #2a2e3a}
 #sidebar-header h1{font-size:16px;font-weight:700;color:#fff;margin-bottom:10px;letter-spacing:-0.3px}
@@ -141,16 +198,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .file-item .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .file-item .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .file-item .count{font-size:10px;color:#555d6e}
-
-/* ---- Graph area ---- */
+.file-item .expand{font-size:10px;color:#555d6e;transition:transform .2s}
+.file-item.active .expand{transform:rotate(90deg);color:#6d7eee}
 #main{flex:1;display:flex;flex-direction:column;position:relative}
 #cy{flex:1}
 #toolbar{position:absolute;top:12px;right:12px;display:flex;gap:6px;z-index:5}
 .tbtn{background:#1e2230;border:1px solid #2a2e3a;border-radius:6px;color:#888;padding:6px 12px;font-size:12px;cursor:pointer;transition:all .15s}
 .tbtn:hover{border-color:#6d7eee;color:#d1d5db}
 .tbtn.on{background:#6d7eee22;border-color:#6d7eee;color:#6d7eee}
-
-/* ---- Detail panel ---- */
 #detail{position:absolute;top:0;right:0;bottom:0;width:340px;background:#161922;border-left:1px solid #2a2e3a;transform:translateX(100%);transition:transform .2s;z-index:8;overflow-y:auto;padding:16px}
 #detail.open{transform:translateX(0)}
 #detail h3{font-size:15px;color:#fff;margin-bottom:6px}
@@ -165,15 +220,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .conn-tag{background:#1e2230;padding:1px 6px;border-radius:6px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.4px}
 #close-detail{position:absolute;top:12px;right:12px;background:none;border:none;color:#555d6e;cursor:pointer;font-size:18px}
 #close-detail:hover{color:#d1d5db}
-
-/* ---- Loading ---- */
 #loading{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:#0f1117cc;z-index:20;font-size:14px;color:#6d7eee}
 #loading.show{display:flex}
 </style>
 </head>
 <body>
 
-<!-- Sidebar -->
 <div id="sidebar">
   <div id="sidebar-header">
     <h1><span>kc</span>-graph</h1>
@@ -189,13 +241,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   <div id="file-list"></div>
 </div>
 
-<!-- Graph -->
 <div id="main">
   <div id="cy"></div>
-  <div id="loading">Loading graph...</div>
+  <div id="loading">Loading...</div>
   <div id="toolbar">
     <button class="tbtn on" data-action="fit" title="Fit to screen">Fit</button>
-    <button class="tbtn" data-action="focus" title="Focus mode: show only selected node connections">Focus</button>
   </div>
   <div id="detail">
     <button id="close-detail">&times;</button>
@@ -205,6 +255,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 
 <script>
 var GRAPH = ${graphJSON};
+var CHILD_COUNTS = ${childCounts};
+var currentProject = '${activeProject ?? ''}';
 
 var COLORS = {
   file:'#6d7eee', function:'#f59e0b', class:'#a78bfa', variable:'#34d399',
@@ -217,9 +269,12 @@ var EDGE_C = {
 };
 
 var cy;
+var expanded = {};
 
-function initGraph(data){
+function initGraph(data, counts){
   if(cy) cy.destroy();
+  expanded = {};
+  CHILD_COUNTS = counts || CHILD_COUNTS;
 
   var elements = [];
   data.nodes.forEach(function(n){ elements.push({group:'nodes',data:n.data}); });
@@ -231,7 +286,7 @@ function initGraph(data){
     style: [
       { selector:'node', style:{
         'shape':'round-rectangle',
-        'width': function(e){ var t=e.data('type'); return t==='file'?140:t==='class'?120:90; },
+        'width': function(e){ var t=e.data('type'); return t==='file'?160:t==='class'?120:90; },
         'height': function(e){ var t=e.data('type'); return t==='file'?36:t==='class'?32:28; },
         'background-color': function(e){ return COLORS[e.data('type')]||'#9ca3af'; },
         'background-opacity': 0.15,
@@ -242,37 +297,24 @@ function initGraph(data){
         'color':'#d1d5db',
         'font-size': function(e){ return e.data('type')==='file'?11:10; },
         'font-weight': function(e){ return e.data('type')==='file'?'bold':'normal'; },
-        'text-valign':'center',
-        'text-halign':'center',
-        'text-max-width': function(e){ var t=e.data('type'); return t==='file'?130:t==='class'?110:80; },
+        'text-valign':'center','text-halign':'center',
+        'text-max-width': function(e){ var t=e.data('type'); return t==='file'?150:t==='class'?110:80; },
         'text-wrap':'ellipsis',
-        'text-outline-color':'#0f1117',
-        'text-outline-width':1,
-        'overlay-padding':4,
-        'corner-radius':6,
+        'text-outline-color':'#0f1117','text-outline-width':1,
+        'overlay-padding':4,'corner-radius':6,
       }},
       { selector:'node:active', style:{ 'overlay-opacity':0.08 }},
-      { selector:'node.highlight', style:{
-        'border-width':2.5, 'border-opacity':1,
-        'background-opacity':0.25, 'z-index':999,
-      }},
+      { selector:'node.highlight', style:{ 'border-width':2.5, 'border-opacity':1, 'background-opacity':0.25, 'z-index':999 }},
       { selector:'node.semitransparent', style:{ 'opacity':0.12 }},
-      { selector:'node.search-hit', style:{
-        'border-width':2.5, 'border-color':'#f59e0b', 'border-opacity':1,
-        'background-opacity':0.25, 'z-index':999,
-      }},
+      { selector:'node.search-hit', style:{ 'border-width':2.5, 'border-color':'#f59e0b', 'border-opacity':1, 'background-opacity':0.25, 'z-index':999 }},
       { selector:'edge', style:{
         'width': function(e){ var t=e.data('type'); return t==='calls'?2:t==='contains'?1:1.5; },
         'line-color': function(e){ return EDGE_C[e.data('type')]||'#2a2e3a'; },
         'target-arrow-color': function(e){ return EDGE_C[e.data('type')]||'#2a2e3a'; },
-        'target-arrow-shape':'triangle',
-        'arrow-scale':0.6,
-        'curve-style':'bezier',
+        'target-arrow-shape':'triangle','arrow-scale':0.6,'curve-style':'bezier',
         'opacity': function(e){ var t=e.data('type'); return t==='contains'?0.15:t==='calls'?0.5:0.35; },
       }},
-      { selector:'edge.highlight', style:{
-        'opacity':0.9, 'width':2.5, 'z-index':999
-      }},
+      { selector:'edge.highlight', style:{ 'opacity':0.9, 'width':2.5, 'z-index':999 }},
       { selector:'edge.semitransparent', style:{ 'opacity':0.04 }},
       { selector:'edge[type="contains"]', style:{ 'line-style':'dotted', 'target-arrow-shape':'none' }},
       { selector:'edge[type="exports"]', style:{ 'line-style':'dashed', 'line-dash-pattern':[6,3] }},
@@ -281,126 +323,118 @@ function initGraph(data){
     minZoom:0.05, maxZoom:6, wheelSensitivity:0.25,
   });
 
-  doLayout();
+  layoutFiles();
   buildSidebar();
-  bindGraphEvents();
-}
 
-function doLayout(){
-  var groups = {};
-  cy.nodes().forEach(function(n){
-    var g = n.data('fileGroup');
-    if(!groups[g]) groups[g] = [];
-    groups[g].push(n);
-  });
-
-  var keys = Object.keys(groups).sort(function(a,b){
-    return groups[b].length - groups[a].length;
-  });
-
-  var cols = Math.max(1, Math.ceil(Math.sqrt(keys.length)));
-  var gapX = 320, gapY = 280;
-
-  keys.forEach(function(key, idx){
-    var col = idx % cols;
-    var row = Math.floor(idx / cols);
-    var cx = col * gapX;
-    var cy2 = row * gapY;
-    var members = groups[key];
-
-    var fileNode = members.find(function(n){ return n.id() === key; });
-    if(fileNode) fileNode.position({x:cx, y:cy2});
-
-    var children = members.filter(function(n){ return n.id() !== key; });
-    var n = children.length;
-    if(n === 0) return;
-    var perRow = Math.min(n, 3);
-    children.forEach(function(child, i){
-      var r = Math.floor(i / perRow);
-      var c = i % perRow;
-      var offX = (c - (Math.min(n - r*perRow, perRow) - 1) / 2) * 110;
-      var offY = (r + 1) * 55;
-      child.position({x: cx + offX, y: cy2 + offY});
-    });
-  });
-
-  cy.fit(undefined, 40);
-}
-
-function buildSidebar(){
-  // File list
-  var fileListEl = document.getElementById('file-list');
-  fileListEl.innerHTML = '';
-  var fileNodes = cy.nodes().filter(function(n){ return n.data('type')==='file'||n.data('type')==='doc'; });
-  fileNodes.sort(function(a,b){ return a.data('label').localeCompare(b.data('label')); });
-  fileNodes.forEach(function(n){
-    var div = document.createElement('div');
-    div.className = 'file-item';
-    div.dataset.id = n.id();
-    var children = cy.nodes().filter(function(c){ return c.data('fileGroup')===n.id() && c.id()!==n.id(); });
-    div.innerHTML = '<div class="dot" style="background:'+COLORS[n.data('type')]+'"></div>'
-      + '<div class="name">' + esc(n.data('label')) + '</div>'
-      + '<div class="count">' + children.length + '</div>';
-    div.addEventListener('click', function(){
-      document.querySelectorAll('.file-item').forEach(function(el){ el.classList.remove('active'); });
-      div.classList.add('active');
-      var group = cy.collection().merge(n).merge(children);
-      var connected = group.connectedEdges().connectedNodes();
-      cy.animate({ fit:{ eles: group.merge(connected), padding:60 }, duration:300 });
-      showNodeInfo(n);
-    });
-    fileListEl.appendChild(div);
-  });
-
-  // Type filters
-  var filterBar = document.getElementById('filter-bar');
-  filterBar.innerHTML = '';
-  var allTypes = [];
-  cy.nodes().forEach(function(n){ var t=n.data('type'); if(allTypes.indexOf(t)<0) allTypes.push(t); });
-  allTypes.sort();
-  var activeTypes = {};
-  allTypes.forEach(function(t){ activeTypes[t]=true; });
-
-  allTypes.forEach(function(type){
-    var chip = document.createElement('div');
-    chip.className = 'chip on';
-    chip.textContent = type;
-    chip.style.setProperty('--c', COLORS[type]||'#9ca3af');
-    chip.addEventListener('click', function(){
-      activeTypes[type] = !activeTypes[type];
-      chip.classList.toggle('on');
-      cy.batch(function(){
-        cy.nodes().forEach(function(n){
-          n.style('display', activeTypes[n.data('type')] ? 'element' : 'none');
-        });
-      });
-    });
-    filterBar.appendChild(chip);
-  });
-
-  // Update stats
-  var nc = cy.nodes().length, ec = cy.edges().length;
-  var fc = cy.nodes().filter(function(n){ return n.data('type')==='file'; }).length;
-  document.getElementById('stat-nodes').textContent = nc + ' nodes';
-  document.getElementById('stat-edges').textContent = ec + ' edges';
-  document.getElementById('stat-files').textContent = fc + ' files';
-}
-
-function bindGraphEvents(){
   cy.on('tap','node', function(evt){ showNodeInfo(evt.target); });
   cy.on('tap', function(evt){
     if(evt.target === cy){
       cy.elements().removeClass('highlight semitransparent');
       document.getElementById('detail').classList.remove('open');
-      document.querySelectorAll('.file-item').forEach(function(el){ el.classList.remove('active'); });
     }
   });
-  cy.on('mouseover','edge',function(evt){
-    evt.target.style({'opacity':0.9,'width':3,'z-index':999});
+  cy.on('mouseover','edge',function(evt){ evt.target.style({'opacity':0.9,'width':3,'z-index':999}); });
+  cy.on('mouseout','edge',function(evt){ if(!evt.target.hasClass('highlight')) evt.target.removeStyle('opacity width z-index'); });
+}
+
+function layoutFiles(){
+  var fileNodes = cy.nodes().filter(function(n){ var t=n.data('type'); return t==='file'||t==='doc'; });
+  var sorted = [];
+  fileNodes.forEach(function(n){ sorted.push(n); });
+  sorted.sort(function(a,b){ return a.data('label').localeCompare(b.data('label')); });
+  var cols = Math.max(1, Math.ceil(Math.sqrt(sorted.length)));
+  var gapX = 200, gapY = 60;
+  sorted.forEach(function(n, idx){
+    n.position({x: (idx % cols) * gapX, y: Math.floor(idx / cols) * gapY});
   });
-  cy.on('mouseout','edge',function(evt){
-    if(!evt.target.hasClass('highlight')) evt.target.removeStyle('opacity width z-index');
+  cy.fit(undefined, 40);
+}
+
+function toggleFile(fileId){
+  if(expanded[fileId]){
+    // Collapse: remove children
+    var children = cy.nodes().filter(function(n){ return n.data('fileGroup')===fileId && n.id()!==fileId; });
+    children.connectedEdges().remove();
+    children.remove();
+    expanded[fileId] = false;
+    return;
+  }
+
+  // Expand: fetch children from server
+  var loading = document.getElementById('loading');
+  loading.classList.add('show');
+  var url = '/api/file/' + encodeURIComponent(currentProject) + '/' + encodeURIComponent(fileId);
+  fetch(url)
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      expanded[fileId] = true;
+      var fileNode = cy.getElementById(fileId);
+      var pos = fileNode.position();
+      var count = data.nodes.length;
+      var perRow = Math.min(count, 4);
+
+      cy.batch(function(){
+        data.nodes.forEach(function(n, i){
+          var r = Math.floor(i / perRow);
+          var c = i % perRow;
+          var offX = (c - (Math.min(count - r*perRow, perRow) - 1) / 2) * 120;
+          var offY = (r + 1) * 55;
+          cy.add({group:'nodes', data: n.data, position: {x: pos.x + offX, y: pos.y + offY}});
+        });
+        data.edges.forEach(function(e){
+          var src = cy.getElementById(e.data.source);
+          var tgt = cy.getElementById(e.data.target);
+          if(src.length && tgt.length) cy.add({group:'edges', data: e.data});
+        });
+      });
+
+      var added = cy.nodes().filter(function(n){ return n.data('fileGroup')===fileId && n.id()!==fileId; });
+      cy.animate({ fit:{ eles: cy.collection().merge(fileNode).merge(added), padding:80 }, duration:300 });
+      loading.classList.remove('show');
+    })
+    .catch(function(){ loading.classList.remove('show'); });
+}
+
+function buildSidebar(){
+  var fileListEl = document.getElementById('file-list');
+  fileListEl.innerHTML = '';
+  var fileNodes = cy.nodes().filter(function(n){ var t=n.data('type'); return t==='file'||t==='doc'; });
+  var sorted = [];
+  fileNodes.forEach(function(n){ sorted.push(n); });
+  sorted.sort(function(a,b){ return a.data('label').localeCompare(b.data('label')); });
+
+  sorted.forEach(function(n){
+    var div = document.createElement('div');
+    div.className = 'file-item';
+    div.dataset.id = n.id();
+    var count = CHILD_COUNTS[n.id()] || 0;
+    div.innerHTML = (count > 0 ? '<div class="expand">\\u25B6</div>' : '<div class="dot" style="background:'+COLORS[n.data('type')]+'"></div>')
+      + '<div class="name">' + esc(n.data('label')) + '</div>'
+      + '<div class="count">' + (count > 0 ? count : '') + '</div>';
+    div.addEventListener('click', function(){
+      if(count > 0){
+        toggleFile(n.id());
+        div.classList.toggle('active');
+      } else {
+        showNodeInfo(n);
+      }
+    });
+    fileListEl.appendChild(div);
   });
+
+  var filterBar = document.getElementById('filter-bar');
+  filterBar.innerHTML = '';
+  ['file','function','class','variable','type','doc'].forEach(function(type){
+    var chip = document.createElement('div');
+    chip.className = 'chip on';
+    chip.textContent = type;
+    chip.style.setProperty('--c', COLORS[type]||'#9ca3af');
+    filterBar.appendChild(chip);
+  });
+
+  document.getElementById('stat-nodes').textContent = ${stats.nodes} + ' nodes';
+  document.getElementById('stat-edges').textContent = ${stats.edges} + ' edges';
+  document.getElementById('stat-files').textContent = sorted.length + ' files';
 }
 
 function showNodeInfo(node){
@@ -427,11 +461,10 @@ function showNodeInfo(node){
     var isOut = e.data('source')===d.id;
     var otherId = isOut?e.data('target'):e.data('source');
     var other = cy.getElementById(otherId);
-    connByType[t].push({label:other.data('label')||otherId, id:otherId, dir:isOut?'out':'in'});
+    if(other.length) connByType[t].push({label:other.data('label')||otherId, id:otherId, dir:isOut?'out':'in'});
   });
 
-  var types = Object.keys(connByType).sort();
-  types.forEach(function(t){
+  Object.keys(connByType).sort().forEach(function(t){
     var items = connByType[t];
     html+='<div class="section"><div class="section-label">'+t+' ('+items.length+')</div><ul class="conn-list">';
     items.forEach(function(item){
@@ -484,13 +517,11 @@ searchEl.addEventListener('input', function(){
 // ---- Toolbar ----
 document.querySelectorAll('.tbtn').forEach(function(btn){
   btn.addEventListener('click', function(){
-    var action = btn.dataset.action;
-    if(action==='fit'){
+    if(btn.dataset.action==='fit'){
       cy.animate({fit:{eles:cy.elements(':visible'), padding:40}, duration:300});
       cy.elements().removeClass('highlight semitransparent');
       document.getElementById('detail').classList.remove('open');
     }
-    if(action==='focus') btn.classList.toggle('on');
   });
 });
 
@@ -501,28 +532,25 @@ if(projectSelect){
     var name = projectSelect.value;
     var loading = document.getElementById('loading');
     loading.classList.add('show');
+    currentProject = name;
     fetch('/api/graph/' + encodeURIComponent(name))
       .then(function(r){ return r.json(); })
-      .then(function(data){
-        GRAPH = data;
-        // Let browser paint the loading overlay before heavy work
+      .then(function(resp){
         requestAnimationFrame(function(){
           setTimeout(function(){
-            initGraph(GRAPH);
+            initGraph(resp.graph, resp.childCounts);
             document.title = 'kc-graph \\u2014 ' + name;
             loading.classList.remove('show');
           }, 0);
         });
       })
-      .catch(function(){
-        loading.classList.remove('show');
-      });
+      .catch(function(){ loading.classList.remove('show'); });
   });
 }
 
 // ---- Keyboard ----
 document.addEventListener('keydown',function(e){
-  if(e.key==='/'&&document.activeElement!==searchEl&&document.activeElement!==projectSelect){e.preventDefault();searchEl.focus();}
+  if(e.key==='/'&&document.activeElement!==searchEl){e.preventDefault();searchEl.focus();}
   if(e.key==='Escape'){
     searchEl.blur();searchEl.value='';
     cy.nodes().removeClass('search-hit');
@@ -534,7 +562,7 @@ document.addEventListener('keydown',function(e){
 
 function esc(s){return s?s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):''}
 
-initGraph(GRAPH);
+initGraph(GRAPH, CHILD_COUNTS);
 </script>
 </body>
 </html>`;
@@ -550,15 +578,30 @@ export interface ViewerOptions {
   host?: string;
 }
 
-function safeJSON(graph: CodeGraph): string {
-  const cyData = graphToCytoscape(graph);
-  return JSON.stringify(cyData).replace(/<\/script>/gi, '<\\/script>');
+function getChildCounts(graph: CodeGraph): Record<string, number> {
+  const fileGroupMap = getFileGroupMap(graph);
+  const counts: Record<string, number> = {};
+  for (const node of graph.allNodes()) {
+    if (node.type === 'file' || node.type === 'doc') continue;
+    const fileId = fileGroupMap.get(node.id) ?? node.id;
+    counts[fileId] = (counts[fileId] ?? 0) + 1;
+  }
+  return counts;
+}
+
+function safeJSON(s: string): string {
+  return s.replace(/<\/script>/gi, '<\\/script>');
 }
 
 export function exportViewerHTML(graph: CodeGraph): string {
-  const graphJSON = safeJSON(graph);
+  const fileLevel = graphToFileLevel(graph);
+  const childCounts = getChildCounts(graph);
   const stats = { nodes: graph.nodeCount, edges: graph.edgeCount, files: graph.fileCount };
-  return buildHTML(graphJSON, stats);
+  return buildHTML(
+    safeJSON(JSON.stringify(fileLevel)),
+    stats,
+    safeJSON(JSON.stringify(childCounts)),
+  );
 }
 
 export function startViewer(
@@ -596,31 +639,56 @@ export function startViewer(
   }
 
   const activeGraph = graphs.get(activeName)!;
-  const graphJSON = safeJSON(activeGraph);
+  const fileLevel = graphToFileLevel(activeGraph);
+  const childCounts = getChildCounts(activeGraph);
   const stats = {
     nodes: activeGraph.nodeCount,
     edges: activeGraph.edgeCount,
     files: activeGraph.fileCount,
   };
-  const html = buildHTML(graphJSON, stats, projectInfos, activeName);
+  const html = buildHTML(
+    safeJSON(JSON.stringify(fileLevel)),
+    stats,
+    safeJSON(JSON.stringify(childCounts)),
+    projectInfos,
+    activeName,
+  );
 
   const server = createServer((req, res) => {
     const url = req.url ?? '/';
 
+    // GET /api/graph/<project> — file-level graph + child counts
     if (url.startsWith('/api/graph/')) {
       const name = decodeURIComponent(url.slice('/api/graph/'.length));
       const graph = graphs.get(name);
       if (!graph) {
         res.writeHead(404, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Project not found' }));
+        res.end(JSON.stringify({ error: 'Not found' }));
         return;
       }
-      const data = graphToCytoscape(graph);
-      res.writeHead(200, {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache',
-      });
-      res.end(JSON.stringify(data));
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
+      res.end(
+        JSON.stringify({
+          graph: graphToFileLevel(graph),
+          childCounts: getChildCounts(graph),
+        }),
+      );
+      return;
+    }
+
+    // GET /api/file/<project>/<fileId> — children of a file
+    if (url.startsWith('/api/file/')) {
+      const parts = url.slice('/api/file/'.length).split('/');
+      const projectName = decodeURIComponent(parts[0] ?? '');
+      const fileId = decodeURIComponent(parts.slice(1).join('/'));
+      const graph = graphs.get(projectName);
+      if (!graph) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Not found' }));
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
+      res.end(JSON.stringify(getFileChildren(graph, fileId)));
       return;
     }
 
