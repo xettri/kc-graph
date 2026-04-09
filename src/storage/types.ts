@@ -115,6 +115,37 @@ export interface RegistryEntry {
   name: string;
   /** Last sync timestamp. */
   lastSync: number;
+  /** Git branch when last indexed. Null/undefined if not a git repo. */
+  branch?: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Scope
+// ---------------------------------------------------------------------------
+
+export interface ScopeMeta {
+  /** Scope name (matches directory name). */
+  name: string;
+  /** Creation timestamp (ms since epoch). */
+  createdAt: number;
+}
+
+export interface UserConfig {
+  /** Currently active scope name. */
+  activeScope: string;
+}
+
+export interface ScopeInfo {
+  /** Scope name. */
+  name: string;
+  /** Number of projects in this scope. */
+  projectCount: number;
+  /** Most recent lastSync across all projects in scope. */
+  lastSync: number;
+  /** When this scope was created (ms since epoch). */
+  createdAt: number;
+  /** Whether this is the currently active scope. */
+  active: boolean;
 }
 
 // ---------------------------------------------------------------------------

@@ -30,9 +30,13 @@ export interface StatusInfo {
 /**
  * Get comprehensive status for a project's graph.
  */
-export function getProjectStatus(root: string, global: boolean = false): StatusInfo {
+export function getProjectStatus(
+  root: string,
+  global: boolean = false,
+  scope?: string,
+): StatusInfo {
   const absRoot = resolve(root);
-  const store = resolveStore(absRoot, { global });
+  const store = resolveStore(absRoot, { global, scope });
 
   if (!store.exists()) {
     throw new Error(`No graph found for ${absRoot}. Run "kc-graph init" first.`);
@@ -151,7 +155,7 @@ export function getProjectStatus(root: string, global: boolean = false): StatusI
 /**
  * CLI entry point for `kc-graph status`.
  */
-export function runStatus(args: { path: string; global: boolean }): void {
+export function runStatus(args: { path: string; global: boolean; scope?: string }): void {
   const root = resolve(args.path);
 
   if (!existsSync(root)) {
@@ -161,7 +165,7 @@ export function runStatus(args: { path: string; global: boolean }): void {
 
   let status: StatusInfo;
   try {
-    status = getProjectStatus(root, args.global);
+    status = getProjectStatus(root, args.global, args.scope);
   } catch (err) {
     console.error((err as Error).message);
     process.exit(1);
@@ -205,7 +209,7 @@ export function runStatus(args: { path: string; global: boolean }): void {
   }
 }
 
-function timeSince(epochMs: number): string {
+export function timeSince(epochMs: number): string {
   const seconds = Math.floor((Date.now() - epochMs) / 1000);
   if (seconds < 60) return `${seconds}s ago`;
   const minutes = Math.floor(seconds / 60);

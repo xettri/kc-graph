@@ -174,9 +174,10 @@ export interface ToolResult {
 
 export function createToolHandlers(
   projects: ProjectMap,
+  scope?: string,
 ): Record<string, (args: Record<string, unknown>) => ToolResult> {
   return {
-    list_projects: () => handleListProjects(projects),
+    list_projects: () => handleListProjects(projects, scope),
     search_code: (args) => handleSearchCode(projects, args),
     get_context: (args) => handleGetContext(projects, args),
     get_impact: (args) => handleGetImpact(projects, args),
@@ -200,7 +201,7 @@ function projectPrefix(name: string, multiProject: boolean): string {
   return multiProject ? `[${name}] ` : '';
 }
 
-function handleListProjects(projects: ProjectMap): ToolResult {
+function handleListProjects(projects: ProjectMap, scope?: string): ToolResult {
   const list = [...projects.entries()].map(([name, entry]) => ({
     name,
     path: entry.path,
@@ -209,8 +210,10 @@ function handleListProjects(projects: ProjectMap): ToolResult {
     files: new Set([...entry.graph.allNodes()].map((n) => n.location?.file).filter(Boolean)).size,
   }));
 
+  const response = scope ? { scope, projects: list } : list;
+
   return {
-    content: [{ type: 'text', text: JSON.stringify(list, null, 2) }],
+    content: [{ type: 'text', text: JSON.stringify(response, null, 2) }],
   };
 }
 

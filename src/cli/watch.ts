@@ -7,6 +7,7 @@ import { resolveStore } from '../storage/resolver.js';
 export interface WatchOptions {
   root?: string;
   global?: boolean;
+  scope?: string;
   debounceMs?: number;
   verbose?: boolean;
   onSync?: (result: { added: number; updated: number; removed: number; duration: number }) => void;
@@ -23,8 +24,9 @@ export function startWatch(options: WatchOptions = {}): { close: () => void } {
   const root = resolve(options.root ?? process.cwd());
   const debounceMs = options.debounceMs ?? 500;
   const global = options.global ?? false;
+  const scope = options.scope;
 
-  const store = resolveStore(root, { global });
+  const store = resolveStore(root, { global, scope });
   if (!store.exists()) {
     throw new Error(`No graph found for ${root}. Run "kc-graph init" first.`);
   }
@@ -44,6 +46,7 @@ export function startWatch(options: WatchOptions = {}): { close: () => void } {
       const result = await syncProject({
         root,
         global,
+        scope,
         onError: (file, err) => {
           options.onError?.(new Error(`${file}: ${err.message}`));
         },
@@ -128,6 +131,7 @@ export async function runWatch(args: {
   path: string;
   global: boolean;
   verbose: boolean;
+  scope?: string;
 }): Promise<void> {
   const root = resolve(args.path);
 
@@ -136,7 +140,7 @@ export async function runWatch(args: {
     process.exit(1);
   }
 
-  const store = resolveStore(root, { global: args.global });
+  const store = resolveStore(root, { global: args.global, scope: args.scope });
   if (!store.exists()) {
     console.error(`No graph found for ${root}`);
     console.error('Run "kc-graph init" first to index the project.');
@@ -149,6 +153,7 @@ export async function runWatch(args: {
   const { close } = startWatch({
     root,
     global: args.global,
+    scope: args.scope,
     verbose: args.verbose,
     onSync: (result) => {
       const parts: string[] = [];

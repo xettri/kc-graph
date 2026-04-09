@@ -82,6 +82,22 @@ export type {
   RegistryEntry,
 } from './storage/types.js';
 export { DEFAULT_CONFIG, generateChunkId } from './storage/types.js';
+export {
+  resolveScope,
+  validateScopeName,
+  getActiveScope,
+  setActiveScope,
+  resetActiveScope,
+  listScopes,
+  scopeExists,
+  deleteScope,
+  ensureScopeDir,
+  scopePath,
+  detectGitBranch,
+  DEFAULT_SCOPE,
+  getGlobalRoot,
+} from './storage/scope.js';
+export type { ScopeMeta, UserConfig, ScopeInfo } from './storage/types.js';
 
 // File Discovery
 export { discoverFiles } from './cli/discover.js';

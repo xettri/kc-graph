@@ -1,10 +1,11 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { resolve, join } from 'node:path';
 import { CodeGraph } from '../core/graph.js';
 import { indexSourceFile } from '../parser/typescript-parser.js';
 import { indexDocFile } from '../parser/doc-parser.js';
 import { createStore, resolveStore } from './resolver.js';
+import { resolveScope, scopePath, detectGitBranch } from './scope.js';
 import { discoverFiles } from '../cli/discover.js';
 import type { DiscoverOptions } from '../cli/discover.js';
 import type { StorageConfig, SyncResult } from './types.js';
@@ -12,6 +13,10 @@ import type { StorageConfig, SyncResult } from './types.js';
 export interface IndexOptions extends DiscoverOptions {
   /** Use global storage (~/.kc-graph/) instead of local .kc-graph/. */
   global?: boolean;
+  /** Scope name for scoped storage. */
+  scope?: string;
+  /** Skip branch safety check. */
+  force?: boolean;
   /** Storage config overrides. */
   config?: Partial<StorageConfig>;
   /** Show progress for each file. */
@@ -29,7 +34,11 @@ export async function initProject(options: IndexOptions = {}): Promise<SyncResul
   const start = performance.now();
 
   // Create storage
-  const store = createStore(root, { global: options.global, config: options.config });
+  const store = createStore(root, {
+    global: options.global,
+    scope: options.scope,
+    config: options.config,
+  });
 
   if (store.exists()) {
     throw new Error(
@@ -96,10 +105,41 @@ export async function syncProject(options: IndexOptions = {}): Promise<SyncResul
   const start = performance.now();
 
   // Resolve existing storage
-  const store = resolveStore(root, { global: options.global, config: options.config });
+  const store = resolveStore(root, {
+    global: options.global,
+    scope: options.scope,
+    config: options.config,
+  });
 
   if (!store.exists()) {
     throw new Error(`No existing storage found. Run "kc-graph init" first.`);
+  }
+
+  // Branch safety check: warn if project was indexed on a different branch
+  if (!options.force) {
+    const resolvedScope = resolveScope(options.scope);
+    const scopeDir = options.global ? scopePath(resolvedScope, true) : null;
+    if (scopeDir) {
+      const registryPath = join(scopeDir, 'registry.json');
+      if (existsSync(registryPath)) {
+        const registry = JSON.parse(readFileSync(registryPath, 'utf-8'));
+        for (const entry of Object.values(registry.projects) as Array<{
+          path: string;
+          branch?: string | null;
+          name: string;
+        }>) {
+          if (resolve(entry.path) === root && entry.branch) {
+            const currentBranch = detectGitBranch(root);
+            if (currentBranch && currentBranch !== entry.branch) {
+              throw new Error(
+                `${entry.name} was indexed on '${entry.branch}' but is currently on '${currentBranch}'. ` +
+                  `Use --force to sync anyway, or switch to '${entry.branch}' first.`,
+              );
+            }
+          }
+        }
+      }
+    }
   }
 
   const map = store.readMap();
