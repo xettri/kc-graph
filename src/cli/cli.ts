@@ -3,7 +3,12 @@
 import { resolve, basename, dirname, join } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
 import { initProject, syncProject } from './indexer.js';
-import { resolveStore, loadAllGlobalProjects, listGlobalProjects } from '../storage/resolver.js';
+import {
+  resolveStore,
+  loadAllGlobalProjects,
+  listGlobalProjects,
+  removeProject,
+} from '../storage/resolver.js';
 import { startMcpServer } from '../mcp/server.js';
 import { singleProject } from '../mcp/tools.js';
 import { startViewer } from './viewer.js';
@@ -132,6 +137,7 @@ Commands:
   status        Show project graph status, staleness, and health metrics
   view          Open interactive graph visualization in browser
   mcp           Start MCP stdio server (for AI agent integration)
+  remove        Remove a project's indexed data and registry entry
   setup         Print MCP config snippet for Claude Code / Cursor
   scope         Manage scoped environments (use, reset, list, delete)
 
@@ -444,6 +450,31 @@ Quick start:
 `);
 }
 
+function runRemove(args: ParsedArgs): void {
+  const root = resolve(args.path);
+  const prefix = scopePrefix(args.scope);
+
+  if (!args.force) {
+    const target = args.global ? `global project at ${root}` : `local storage for ${root}`;
+    console.error(`${prefix}This will permanently delete all indexed data for ${target}.`);
+    console.error(
+      `Run with --force to confirm: kc-graph remove${args.path !== '.' ? ' ' + args.path : ''}${args.global ? ' --global' : ''}${args.scope ? ' --scope ' + args.scope : ''} --force`,
+    );
+    process.exit(1);
+  }
+
+  try {
+    const { storagePath, name } = removeProject(root, {
+      global: args.global,
+      scope: args.scope,
+    });
+    console.log(`${prefix}Removed ${name} (${storagePath})`);
+  } catch (err) {
+    console.error(`${prefix}${(err as Error).message}`);
+    process.exit(1);
+  }
+}
+
 function runScope(args: ParsedArgs): void {
   const sub = args.subcommand;
 
@@ -554,6 +585,9 @@ async function main(): Promise<void> {
       break;
     case 'setup':
       runSetup(args);
+      break;
+    case 'remove':
+      runRemove(args);
       break;
     case 'scope':
       runScope(args);

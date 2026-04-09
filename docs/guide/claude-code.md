@@ -16,6 +16,21 @@ The server loads the graph from `.kc-graph/` and serves 8 tools over stdio.
 
 ## Configure Claude Code
 
+### Quick add (recommended)
+
+```bash
+# Single project
+claude mcp add kc-graph -- kc-graph mcp
+
+# Multi-project (global)
+claude mcp add kc-graph -- kc-graph mcp --global
+
+# With scope
+claude mcp add kc-graph -- kc-graph mcp --global --scope develop
+```
+
+### Manual config
+
 Add to `~/.claude/settings.json`:
 
 ```json

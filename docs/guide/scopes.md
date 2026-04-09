@@ -39,6 +39,12 @@ kc-graph init --global --scope develop ~/work/api-gateway
 kc-graph mcp --global --scope develop
 ```
 
+Configure Claude Code:
+
+```bash
+claude mcp add kc-graph -- kc-graph mcp --global --scope develop
+```
+
 ## Scope Resolution
 
 When you run any command, kc-graph determines the scope using this priority:

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { join, resolve, basename } from 'node:path';
 import { createHash } from 'node:crypto';
 import { ChunkStore } from './chunk-store.js';
@@ -65,10 +65,7 @@ export function createStore(
   return new ChunkStore(localPath, options?.config);
 }
 
-// ---------------------------------------------------------------------------
 // Global registry (scope-aware)
-// ---------------------------------------------------------------------------
-
 function getGlobalStore(
   projectRoot: string,
   scope: string,
@@ -130,10 +127,7 @@ function writeRegistry(scopeDir: string, registry: GlobalRegistry): void {
   writeFileSync(path, JSON.stringify(registry, null, 2));
 }
 
-// ---------------------------------------------------------------------------
 // Utility: list all globally tracked projects (scope-aware)
-// ---------------------------------------------------------------------------
-
 export function listGlobalProjects(scope?: string): RegistryEntry[] {
   const resolvedScope = resolveScopeFromConfig(scope);
   const scopeDir = scopePath(resolvedScope, true);
@@ -162,6 +156,55 @@ export function loadAllGlobalProjects(
   }
 
   return result;
+}
+
+/**
+ * Remove a project's indexed data and registry entry.
+ *
+ * Global: deletes ~/.kc-graph/<scope>/projects/<id>/ and removes from registry.
+ * Local: deletes <projectRoot>/.kc-graph/<scope>/ entirely.
+ */
+export function removeProject(
+  projectRoot: string,
+  options?: { global?: boolean; scope?: string },
+): { storagePath: string; name: string } {
+  const root = resolve(projectRoot);
+  const scope = resolveScopeFromConfig(options?.scope);
+
+  if (options?.global) {
+    const scopeDir = scopePath(scope, true);
+    const projectId = getProjectId(root);
+    const projectDir = join(scopeDir, 'projects', projectId);
+
+    // Read registry to get project name before removing
+    const registry = readRegistry(scopeDir);
+    const entry = registry.projects[projectId];
+    if (!entry) {
+      throw new Error(`Project not found in registry. Not indexed in this scope.`);
+    }
+    const name = entry.name;
+
+    // Delete project storage
+    if (existsSync(projectDir)) {
+      rmSync(projectDir, { recursive: true, force: true });
+    }
+
+    // Remove from registry
+    delete registry.projects[projectId];
+    writeRegistry(scopeDir, registry);
+
+    return { storagePath: projectDir, name };
+  }
+
+  // Local: delete the entire scope directory for this project
+  const localPath = scopePath(scope, false, root);
+  if (!existsSync(localPath) || !existsSync(join(localPath, 'meta.json'))) {
+    throw new Error(`No local storage found at ${localPath}`);
+  }
+
+  const name = basename(root);
+  rmSync(localPath, { recursive: true, force: true });
+  return { storagePath: localPath, name };
 }
 
 export function getGlobalStoragePath(scope?: string): string {

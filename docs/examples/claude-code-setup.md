@@ -44,7 +44,15 @@ Run the setup command to get the config:
 kc-graph setup
 ```
 
-Then add to your Claude Code settings (`~/.claude/settings.json`):
+### Option A: Quick add (recommended)
+
+```bash
+claude mcp add kc-graph -- kc-graph mcp
+```
+
+### Option B: Manual config
+
+Add to your Claude Code settings (`~/.claude/settings.json`):
 
 ```json
 {
@@ -182,6 +190,12 @@ kc-graph init --global ~/work/shared-lib
 ```
 
 Configure Claude Code for multi-project mode:
+
+```bash
+claude mcp add kc-graph -- kc-graph mcp --global
+```
+
+Or manually in `settings.json` / `.mcp.json`:
 
 ```json
 {

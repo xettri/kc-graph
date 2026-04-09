@@ -67,6 +67,7 @@ export {
   listGlobalProjects,
   loadAllGlobalProjects,
   getGlobalStoragePath,
+  removeProject,
 } from './storage/resolver.js';
 export { initProject, syncProject } from './storage/indexer.js';
 export type { IndexOptions } from './storage/indexer.js';
