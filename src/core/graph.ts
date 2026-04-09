@@ -41,7 +41,7 @@ export class CodeGraph {
     const node = createNode(input);
 
     if (this.nodes.has(node.id)) {
-      throw new Error(`Node already exists: ${node.id}`);
+      return this.nodes.get(node.id)!;
     }
 
     this.nodes.set(node.id, node);

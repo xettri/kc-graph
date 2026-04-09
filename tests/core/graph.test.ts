@@ -37,11 +37,12 @@ describe('CodeGraph', () => {
       expect(retrieved).toBe(node);
     });
 
-    it('should reject duplicate node IDs', () => {
-      graph.addNode({ type: 'function', name: 'foo', qualifiedName: 'foo' });
-      expect(() => graph.addNode({ type: 'function', name: 'bar', qualifiedName: 'foo' })).toThrow(
-        'Node already exists: foo',
-      );
+    it('should return existing node on duplicate ID', () => {
+      const first = graph.addNode({ type: 'function', name: 'foo', qualifiedName: 'foo' });
+      const second = graph.addNode({ type: 'function', name: 'bar', qualifiedName: 'foo' });
+      expect(second.id).toBe(first.id);
+      expect(second.name).toBe('foo');
+      expect(graph.nodeCount).toBe(1);
     });
 
     it('should remove a node and its edges', () => {

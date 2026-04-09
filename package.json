@@ -1,6 +1,6 @@
 {
   "name": "kc-graph",
-  "version": "0.0.1-beta.1",
+  "version": "0.0.1",
   "description": "AI-optimized code intelligence graph — maps codebases at module/function/variable level for token-efficient AI context retrieval",
   "repository": {
     "type": "git",
@@ -36,7 +36,7 @@
   ],
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "npm run clean && npm run build:esm && npm run build:cjs",
+    "build": "pnpm clean && pnpm build:esm && pnpm build:cjs",
     "build:esm": "tsc -p tsconfig.build.json",
     "build:cjs": "tsc -p tsconfig.cjs.json && echo '{\"type\":\"commonjs\"}' > dist/cjs/package.json",
     "postbuild": "chmod +x dist/cjs/cli/cli.js",
@@ -47,25 +47,24 @@
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
     "typecheck": "tsc --noEmit",
-    "prepack": "npm run build && npm run typecheck",
-    "local:link": "npm run build && npm link",
+    "prepack": "pnpm build && pnpm typecheck",
+    "local:link": "pnpm build && npm link",
     "local:unlink": "npm unlink -g kc-graph",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
+    "prerelease": "pnpm build && node scripts/prepare-npm.cjs",
+    "release": "pnpm prerelease && cd dist && pnpm publish --access public",
+    "release:dry": "pnpm release --dry-run",
     "prepare": "husky"
   },
   "keywords": [
     "knowledge-graph",
-    "code-intelligence",
     "ai",
     "rag",
     "graph",
-    "code-analysis",
     "mcp",
-    "claude",
-    "ast",
-    "typescript"
+    "claude"
   ],
   "author": "xettri",
   "license": "MIT",
