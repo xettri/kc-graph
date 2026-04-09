@@ -654,10 +654,12 @@ export function startViewer(
     activeName,
   );
 
-  const server = createServer((req, res) => {
+  const handler = (
+    req: import('node:http').IncomingMessage,
+    res: import('node:http').ServerResponse,
+  ) => {
     const url = req.url ?? '/';
 
-    // GET /api/graph/<project> — file-level graph + child counts
     if (url.startsWith('/api/graph/')) {
       const name = decodeURIComponent(url.slice('/api/graph/'.length));
       const graph = graphs.get(name);
@@ -694,27 +696,34 @@ export function startViewer(
 
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(html);
-  });
+  };
 
-  server.listen(port, host, () => {
-    const url = `http://${host}:${port}`;
-    console.log(`kc-graph viewer running at ${url}`);
-    if (isMulti) {
-      console.log(`${graphs.size} projects loaded`);
-    } else {
-      console.log(`${stats.nodes} nodes, ${stats.edges} edges, ${stats.files} files`);
-    }
-    console.log('Press Ctrl+C to stop');
-    if (options.open !== false) openBrowser(url);
-  });
+  function tryListen(p: number, remaining: number): void {
+    const s = createServer(handler);
+    s.once('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'EADDRINUSE' && remaining > 0) {
+        tryListen(p + 1, remaining - 1);
+      } else if (err.code === 'EADDRINUSE') {
+        console.error(`No available port found. Use --port <number> to specify one.`);
+        process.exit(1);
+      } else {
+        throw err;
+      }
+    });
+    s.listen(p, host, () => {
+      const url = `http://${host}:${p}`;
+      console.log(`kc-graph viewer running at ${url}`);
+      if (isMulti) {
+        console.log(`${graphs.size} projects loaded`);
+      } else {
+        console.log(`${stats.nodes} nodes, ${stats.edges} edges, ${stats.files} files`);
+      }
+      console.log('Press Ctrl+C to stop');
+      if (options.open !== false) openBrowser(url);
+    });
+  }
 
-  server.on('error', (err: NodeJS.ErrnoException) => {
-    if (err.code === 'EADDRINUSE') {
-      console.error(`Port ${port} is in use. Try: kc-graph view --port ${port + 1}`);
-      process.exit(1);
-    }
-    throw err;
-  });
+  tryListen(port, 10);
 }
 
 function openBrowser(url: string): void {
