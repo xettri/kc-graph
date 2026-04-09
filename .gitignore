@@ -10,3 +10,4 @@ coverage/
 .kc-graph.cache
 docs/.vitepress/dist/
 docs/.vitepress/cache/
+tmp
