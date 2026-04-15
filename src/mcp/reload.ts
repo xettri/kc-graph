@@ -21,10 +21,19 @@ export function createRefresher(projects: ProjectMap, scopeDir: string): () => v
 
   const registryPath = join(scopeDir, 'registry.json');
 
-  function lazyEntry(store: ChunkStore, path: string): { graph: CodeGraph; path: string } {
+  function lazyEntry(
+    store: ChunkStore,
+    path: string,
+  ): { graph: CodeGraph; path: string; stats?: { nodes: number; edges: number; files: number } } {
     let cached: CodeGraph | null = null;
+    let stats: { nodes: number; edges: number; files: number } | undefined;
+    try {
+      const meta = store.readMeta();
+      stats = { nodes: meta.stats.nodes, edges: meta.stats.edges, files: meta.stats.files };
+    } catch {}
     return {
       path,
+      stats,
       get graph(): CodeGraph {
         if (!cached) {
           cached = store.loadGraph();

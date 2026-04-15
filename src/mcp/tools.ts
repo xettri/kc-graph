@@ -10,6 +10,8 @@ import { reviewChanges, formatReviewSummary } from '../operations/review.js';
 export interface ProjectEntry {
   graph: CodeGraph;
   path: string;
+  /** Lightweight stats from meta.json — avoids loading graph for list_projects. */
+  stats?: { nodes: number; edges: number; files: number };
 }
 
 export type ProjectMap = Map<string, ProjectEntry>;
@@ -205,9 +207,11 @@ function handleListProjects(projects: ProjectMap, scope?: string): ToolResult {
   const list = [...projects.entries()].map(([name, entry]) => ({
     name,
     path: entry.path,
-    nodes: entry.graph.nodeCount,
-    edges: entry.graph.edgeCount,
-    files: new Set([...entry.graph.allNodes()].map((n) => n.location?.file).filter(Boolean)).size,
+    nodes: entry.stats?.nodes ?? entry.graph.nodeCount,
+    edges: entry.stats?.edges ?? entry.graph.edgeCount,
+    files:
+      entry.stats?.files ??
+      new Set([...entry.graph.allNodes()].map((n) => n.location?.file).filter(Boolean)).size,
   }));
 
   const response = scope ? { scope, projects: list } : list;

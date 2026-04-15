@@ -162,11 +162,17 @@ export function loadAllGlobalProjects(
  */
 export function lazyLoadGlobalProjects(
   scope?: string,
-): Map<string, { graph: CodeGraph; path: string }> {
+): Map<
+  string,
+  { graph: CodeGraph; path: string; stats?: { nodes: number; edges: number; files: number } }
+> {
   const resolvedScope = resolveScopeFromConfig(scope);
   const scopeDir = scopePath(resolvedScope, true);
   const registry = readRegistry(scopeDir);
-  const result = new Map<string, { graph: CodeGraph; path: string }>();
+  const result = new Map<
+    string,
+    { graph: CodeGraph; path: string; stats?: { nodes: number; edges: number; files: number } }
+  >();
 
   for (const [projectId, entry] of Object.entries(registry.projects)) {
     const storePath = join(scopeDir, 'projects', projectId);
@@ -174,9 +180,14 @@ export function lazyLoadGlobalProjects(
       const store = new ChunkStore(storePath);
       if (!store.exists()) continue;
 
+      // Read stats from meta.json (cheap) instead of loading the full graph
+      const meta = store.readMeta();
+      const metaStats = meta.stats;
+
       let cached: CodeGraph | null = null;
       const lazy = {
         path: entry.path,
+        stats: { nodes: metaStats.nodes, edges: metaStats.edges, files: metaStats.files },
         get graph(): CodeGraph {
           if (!cached) {
             cached = store.loadGraph();
