@@ -156,6 +156,42 @@ export function loadAllGlobalProjects(
 }
 
 /**
+ * Lazy-loading variant: registers all projects but defers loadGraph()
+ * until a project's graph is first accessed. Returns a ProjectMap
+ * compatible with MCP tools — graph getter is transparent.
+ */
+export function lazyLoadGlobalProjects(
+  scope?: string,
+): Map<string, { graph: CodeGraph; path: string }> {
+  const resolvedScope = resolveScopeFromConfig(scope);
+  const scopeDir = scopePath(resolvedScope, true);
+  const registry = readRegistry(scopeDir);
+  const result = new Map<string, { graph: CodeGraph; path: string }>();
+
+  for (const [projectId, entry] of Object.entries(registry.projects)) {
+    const storePath = join(scopeDir, 'projects', projectId);
+    try {
+      const store = new ChunkStore(storePath);
+      if (!store.exists()) continue;
+
+      let cached: CodeGraph | null = null;
+      const lazy = {
+        path: entry.path,
+        get graph(): CodeGraph {
+          if (!cached) {
+            cached = store.loadGraph();
+          }
+          return cached;
+        },
+      };
+      result.set(entry.name, lazy);
+    } catch {}
+  }
+
+  return result;
+}
+
+/**
  * Remove a project's indexed data and registry entry.
  *
  * Global: deletes ~/.kc-graph/<scope>/projects/<id>/ and removes from registry.

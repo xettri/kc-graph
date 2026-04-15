@@ -66,6 +66,7 @@ export {
   createStore,
   listGlobalProjects,
   loadAllGlobalProjects,
+  lazyLoadGlobalProjects,
   getGlobalStoragePath,
   removeProject,
 } from './storage/resolver.js';

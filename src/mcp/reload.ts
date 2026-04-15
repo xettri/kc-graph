@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { ChunkStore } from '../storage/chunk-store.js';
+import type { CodeGraph } from '../core/graph.js';
 import type { ProjectMap } from './tools.js';
 import type { GlobalRegistry } from '../storage/types.js';
 
@@ -12,12 +13,26 @@ interface StoreState {
 /**
  * Check registry and meta.json mtimes before each tool call.
  * Detects new projects, removed projects, and updated graphs.
+ * New/updated projects use lazy loading — graph is loaded on first access.
  */
 export function createRefresher(projects: ProjectMap, scopeDir: string): () => void {
   const states = new Map<string, StoreState>();
   let lastRegistryMtime = 0;
 
   const registryPath = join(scopeDir, 'registry.json');
+
+  function lazyEntry(store: ChunkStore, path: string): { graph: CodeGraph; path: string } {
+    let cached: CodeGraph | null = null;
+    return {
+      path,
+      get graph(): CodeGraph {
+        if (!cached) {
+          cached = store.loadGraph();
+        }
+        return cached;
+      },
+    };
+  }
 
   function syncFromRegistry() {
     if (!existsSync(registryPath)) return;
@@ -36,17 +51,14 @@ export function createRefresher(projects: ProjectMap, scopeDir: string): () => v
       const storagePath = join(scopeDir, 'projects', projectId);
 
       if (!states.has(entry.name)) {
-        // New project — load it
+        // New project — register lazily
         try {
           const store = new ChunkStore(storagePath);
           if (!store.exists()) continue;
-          const graph = store.loadGraph();
           const mtime = statSync(join(storagePath, 'meta.json')).mtimeMs;
-          projects.set(entry.name, { graph, path: entry.path });
+          projects.set(entry.name, lazyEntry(store, entry.path));
           states.set(entry.name, { storagePath, lastMtime: mtime });
-          process.stderr.write(
-            `[reload] +${entry.name}: ${graph.nodeCount} nodes, ${graph.edgeCount} edges\n`,
-          );
+          process.stderr.write(`[reload] +${entry.name}\n`);
         } catch {
           // skip
         }
@@ -104,7 +116,7 @@ export function createRefresher(projects: ProjectMap, scopeDir: string): () => v
       // no registry
     }
 
-    // Check existing projects for graph updates
+    // Check existing projects for graph updates — replace with fresh lazy entry
     for (const [name, state] of states) {
       try {
         const mtime = statSync(join(state.storagePath, 'meta.json')).mtimeMs;
@@ -113,14 +125,11 @@ export function createRefresher(projects: ProjectMap, scopeDir: string): () => v
         const store = new ChunkStore(state.storagePath);
         if (!store.exists()) continue;
 
-        const graph = store.loadGraph();
         const existing = projects.get(name);
         if (existing) {
-          projects.set(name, { graph, path: existing.path });
+          projects.set(name, lazyEntry(store, existing.path));
           state.lastMtime = mtime;
-          process.stderr.write(
-            `[reload] ${name}: ${graph.nodeCount} nodes, ${graph.edgeCount} edges\n`,
-          );
+          process.stderr.write(`[reload] ${name}: updated\n`);
         }
       } catch {
         // skip

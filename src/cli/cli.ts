@@ -6,6 +6,7 @@ import { initProject, syncProject } from './indexer.js';
 import {
   resolveStore,
   loadAllGlobalProjects,
+  lazyLoadGlobalProjects,
   listGlobalProjects,
   removeProject,
   getGlobalStoragePath,
@@ -375,7 +376,7 @@ async function runMcp(args: ParsedArgs): Promise<void> {
   const prefix = scopePrefix(args.scope);
 
   if (args.global) {
-    const projects = loadAllGlobalProjects(args.scope);
+    const projects = lazyLoadGlobalProjects(args.scope);
 
     if (projects.size === 0) {
       console.error(`${prefix}No globally indexed projects found.`);
@@ -383,18 +384,14 @@ async function runMcp(args: ParsedArgs): Promise<void> {
       process.exit(1);
     }
 
-    let totalNodes = 0;
-    let totalEdges = 0;
-    for (const [name, entry] of projects) {
-      const n = entry.graph.nodeCount;
-      const e = entry.graph.edgeCount;
-      totalNodes += n;
-      totalEdges += e;
-      process.stderr.write(`${prefix}  ${name}: ${n} nodes, ${e} edges\n`);
+    // Log project names from registry without loading graphs
+    const registered = listGlobalProjects(args.scope);
+    for (const entry of registered) {
+      process.stderr.write(`${prefix}  ${entry.name}\n`);
     }
 
     process.stderr.write(
-      `${prefix}kc-graph MCP server started — ${projects.size} projects (${totalNodes} nodes, ${totalEdges} edges)\n`,
+      `${prefix}kc-graph MCP server started — ${projects.size} projects (lazy loading)\n`,
     );
 
     startMcpServer(projects, {
