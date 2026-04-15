@@ -26,10 +26,7 @@ const META_FILE = 'meta.json';
 const MAP_FILE = 'map.json';
 const CHUNKS_DIR = 'chunks';
 
-// ---------------------------------------------------------------------------
 // ChunkStore — read/write graph data as chunked files
-// ---------------------------------------------------------------------------
-
 export class ChunkStore {
   readonly storagePath: string;
   private config: StorageConfig;
@@ -38,10 +35,6 @@ export class ChunkStore {
     this.storagePath = storagePath;
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
-
-  // -------------------------------------------------------------------------
-  // Init / Exists
-  // -------------------------------------------------------------------------
 
   /** Check if this storage has been initialized. */
   exists(): boolean {
@@ -66,10 +59,6 @@ export class ChunkStore {
     writeFileSync(join(this.storagePath, META_FILE), JSON.stringify(meta, null, 2));
     writeFileSync(join(this.storagePath, MAP_FILE), JSON.stringify(map));
   }
-
-  // -------------------------------------------------------------------------
-  // Read
-  // -------------------------------------------------------------------------
 
   readMeta(): StorageMeta {
     try {
@@ -153,10 +142,6 @@ export class ChunkStore {
     return graph;
   }
 
-  // -------------------------------------------------------------------------
-  // Write
-  // -------------------------------------------------------------------------
-
   /** Write a chunk to disk. Returns the serialized size. */
   writeChunk(chunk: ChunkData): number {
     const json = JSON.stringify(chunk);
@@ -180,10 +165,6 @@ export class ChunkStore {
   writeMeta(meta: StorageMeta): void {
     atomicWrite(join(this.storagePath, META_FILE), JSON.stringify(meta, null, 2));
   }
-
-  // -------------------------------------------------------------------------
-  // Save graph (full write with chunking)
-  // -------------------------------------------------------------------------
 
   /**
    * Save a full graph to chunked storage.
@@ -367,9 +348,7 @@ export class ChunkStore {
     return chunkIds;
   }
 
-  // -------------------------------------------------------------------------
   // Incremental sync
-  // -------------------------------------------------------------------------
 
   /**
    * Sync specific files into the store.
@@ -447,7 +426,10 @@ export class ChunkStore {
       };
     }
 
-    // Check if orphan chunks are still referenced by other files
+    // Rewrite shared orphan chunks that are still referenced by other files.
+    // When a deleted file shared a chunk with other files, the chunk still
+    // contains the deleted file's nodes on disk. Rewrite those chunks from
+    // the in-memory graph (which already has deleted nodes removed).
     const referencedChunks = new Set<string>();
     for (const entry of Object.values(map.files)) {
       for (const chunkId of entry.chunks) {
@@ -460,16 +442,53 @@ export class ChunkStore {
         this.deleteChunk(chunkId);
         delete map.chunks[chunkId];
         chunksDeleted++;
+      } else {
+        // Shared chunk — rewrite it with only the surviving files' nodes.
+        // Find which files still reference this chunk.
+        const survivingFiles: string[] = [];
+        for (const [file, entry] of Object.entries(map.files)) {
+          if (entry.chunks.includes(chunkId)) {
+            survivingFiles.push(file);
+          }
+        }
+
+        const chunkNodes: CodeNode[] = [];
+        const chunkEdges: CodeEdge[] = [];
+        for (const file of survivingFiles) {
+          const nodes = graph.findByFile(file);
+          for (const node of nodes) {
+            chunkNodes.push(node);
+            const edges = edgesBySource.get(node.id);
+            if (edges) {
+              for (const e of edges) chunkEdges.push(e);
+            }
+          }
+        }
+
+        if (chunkNodes.length === 0) {
+          // All nodes gone — delete the chunk and unmap surviving files
+          this.deleteChunk(chunkId);
+          delete map.chunks[chunkId];
+          chunksDeleted++;
+          for (const file of survivingFiles) {
+            const entry = map.files[file];
+            if (entry) {
+              entry.chunks = entry.chunks.filter((id) => id !== chunkId);
+            }
+          }
+        } else {
+          // Rewrite chunk with surviving nodes only
+          const chunk = buildChunkData(chunkId, chunkNodes, chunkEdges);
+          const size = this.writeChunk(chunk);
+          map.chunks[chunkId] = { size, nodes: chunk.nodes.length, edges: chunk.edges.length };
+          chunksWritten++;
+        }
       }
     }
 
     this.writeMap(map);
     return { chunksWritten, chunksDeleted };
   }
-
-  // -------------------------------------------------------------------------
-  // Cleanup
-  // -------------------------------------------------------------------------
 
   /** Remove orphan chunk files not referenced by map.json. */
   cleanup(): number {
@@ -491,10 +510,6 @@ export class ChunkStore {
     return deleted;
   }
 
-  // -------------------------------------------------------------------------
-  // Helpers
-  // -------------------------------------------------------------------------
-
   private safeFileStat(projectPath: string, relPath: string): { mtime: number; size: number } {
     try {
       const abs = join(projectPath, relPath);
@@ -505,10 +520,6 @@ export class ChunkStore {
     }
   }
 }
-
-// ---------------------------------------------------------------------------
-// Pure helpers
-// ---------------------------------------------------------------------------
 
 function getParentDir(filePath: string): string {
   const idx = filePath.lastIndexOf('/');
