@@ -218,23 +218,36 @@ export function removeProject(
   if (options?.global) {
     const scopeDir = scopePath(scope, true);
     const projectId = getProjectId(root);
-    const projectDir = join(scopeDir, 'projects', projectId);
 
     const registry = readRegistry(scopeDir);
-    const entry = registry.projects[projectId];
+    let matchedId = projectId;
+    let entry = registry.projects[projectId];
+
+    // Fallback: match by project name if path-based lookup fails
+    if (!entry) {
+      for (const [id, regEntry] of Object.entries(registry.projects)) {
+        if (regEntry.name === basename(root)) {
+          matchedId = id;
+          entry = regEntry;
+          break;
+        }
+      }
+    }
+
     if (!entry) {
       throw new Error(`Project not found in registry. Not indexed in this scope.`);
     }
     const name = entry.name;
+    const matchedDir = join(scopeDir, 'projects', matchedId);
 
-    if (existsSync(projectDir)) {
-      rmSync(projectDir, { recursive: true, force: true });
+    if (existsSync(matchedDir)) {
+      rmSync(matchedDir, { recursive: true, force: true });
     }
 
-    delete registry.projects[projectId];
+    delete registry.projects[matchedId];
     writeRegistry(scopeDir, registry);
 
-    return { storagePath: projectDir, name };
+    return { storagePath: matchedDir, name };
   }
 
   const localPath = scopePath(scope, false, root);
