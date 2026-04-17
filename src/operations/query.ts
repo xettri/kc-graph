@@ -138,3 +138,68 @@ export class GraphQuery {
 export function query(graph: CodeGraph): GraphQuery {
   return new GraphQuery(graph);
 }
+
+export interface SearchResult {
+  node: CodeNode;
+  score: number;
+}
+
+const TYPE_SCORES: Record<string, number> = {
+  class: 10,
+  function: 9,
+  type: 8,
+  export: 7,
+  variable: 5,
+  file: 3,
+  doc: 2,
+};
+
+export function search(
+  graph: CodeGraph,
+  term: string,
+  options?: { type?: NodeType; file?: string | RegExp },
+): SearchResult[] {
+  const pattern = new RegExp(escapeForRegex(term), 'i');
+  const termLower = term.toLowerCase();
+  const results: SearchResult[] = [];
+
+  let q = query(graph);
+  if (options?.type) q = q.ofType(options.type);
+  if (options?.file) q = q.inFile(options.file);
+
+  for (const node of q.results()) {
+    const nameMatch = pattern.test(node.name);
+    const qualifiedMatch = !nameMatch && pattern.test(node.qualifiedName);
+    const fileMatch =
+      !nameMatch && !qualifiedMatch && node.location?.file
+        ? pattern.test(node.location.file)
+        : false;
+
+    if (!nameMatch && !qualifiedMatch && !fileMatch) continue;
+
+    let score = 0;
+
+    if (nameMatch) {
+      score += 30;
+      const nameLower = node.name.toLowerCase();
+      if (nameLower === termLower) score += 20;
+      else if (nameLower.startsWith(termLower)) score += 10;
+    } else if (qualifiedMatch) {
+      score += 15;
+    } else {
+      score += 5;
+    }
+
+    score += TYPE_SCORES[node.type] ?? 1;
+    if (graph.hasInEdgeOfType(node.id, 'exports')) score += 5;
+
+    results.push({ node, score });
+  }
+
+  results.sort((a, b) => b.score - a.score);
+  return results;
+}
+
+function escapeForRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}

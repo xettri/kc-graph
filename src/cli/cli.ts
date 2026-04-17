@@ -144,6 +144,7 @@ Commands:
   status        Show project graph status, staleness, and health metrics
   view          Open interactive graph visualization in browser
   mcp           Start MCP stdio server (for AI agent integration)
+  list          List indexed projects
   remove        Remove a project's indexed data and registry entry
   setup         Print MCP config snippet for Claude Code / Cursor
   scope         Manage scoped environments (use, reset, list, delete)
@@ -459,6 +460,47 @@ Quick start:
 `);
 }
 
+function runList(args: ParsedArgs): void {
+  const prefix = scopePrefix(args.scope);
+
+  if (args.global) {
+    const projects = listGlobalProjects(args.scope);
+    if (projects.length === 0) {
+      console.log(`${prefix}No globally indexed projects.`);
+      return;
+    }
+    console.log(`${prefix}Globally indexed projects:\n`);
+    for (const entry of projects) {
+      const date = new Date(entry.lastSync).toLocaleDateString();
+      const branch = entry.branch ? ` (${entry.branch})` : '';
+      console.log(`  ${entry.name}${branch}`);
+      console.log(`    ${entry.path}  synced ${date}`);
+    }
+    console.log(`\n${projects.length} project(s)`);
+    return;
+  }
+
+  // Local: check if current directory has indexed data
+  const root = resolve(args.path);
+  const store = resolveStore(root, { global: false, scope: args.scope });
+
+  if (!store.exists()) {
+    console.log(`${prefix}No local index found at ${root}`);
+    return;
+  }
+
+  const meta = store.readMeta();
+  const name = basename(root);
+  const date = new Date(meta.lastSync).toLocaleDateString();
+
+  console.log(`${prefix}Local project:\n`);
+  console.log(`  ${name}`);
+  console.log(`    ${root}  synced ${date}`);
+  console.log(
+    `    ${meta.stats.nodes} nodes, ${meta.stats.edges} edges, ${meta.stats.files} files`,
+  );
+}
+
 function runRemove(args: ParsedArgs): void {
   const root = resolve(args.path);
   const prefix = scopePrefix(args.scope);
@@ -590,6 +632,10 @@ async function main(): Promise<void> {
       break;
     case 'setup':
       runSetup(args);
+      break;
+    case 'list':
+    case 'ls':
+      runList(args);
       break;
     case 'remove':
       runRemove(args);

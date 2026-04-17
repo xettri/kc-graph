@@ -1,6 +1,6 @@
 {
   "name": "kc-graph",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "AI-optimized code intelligence graph — maps codebases at module/function/variable level for token-efficient AI context retrieval",
   "repository": {
     "type": "git",

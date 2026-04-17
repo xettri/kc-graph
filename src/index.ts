@@ -24,7 +24,8 @@ export { NODE_TYPES, EDGE_TYPES } from './core/types.js';
 
 // Operations
 export { bfs, dfs, kHopNeighborhood } from './operations/traversal.js';
-export { query, GraphQuery } from './operations/query.js';
+export { query, search, GraphQuery } from './operations/query.js';
+export type { SearchResult } from './operations/query.js';
 export { analyzeImpact, formatImpactSummary } from './operations/impact.js';
 export type { ImpactOptions } from './operations/impact.js';
 export { extractSubgraph, getFileStructure } from './operations/subgraph.js';

@@ -248,6 +248,17 @@ export class CodeGraph {
     return result;
   }
 
+  /** Check if a node has any inbound edge of the given type(s). Zero allocations. */
+  hasInEdgeOfType(nodeId: string, ...types: EdgeType[]): boolean {
+    const edgeIds = this.inEdges.get(nodeId);
+    if (!edgeIds || edgeIds.size === 0) return false;
+    for (const eid of edgeIds) {
+      const edge = this.edges.get(eid);
+      if (edge && types.includes(edge.type)) return true;
+    }
+    return false;
+  }
+
   /** Get inbound edges to a node, optionally filtered by edge type. */
   getInEdges(nodeId: string, edgeTypes?: EdgeType[]): CodeEdge[] {
     const edgeIds = this.inEdges.get(nodeId);

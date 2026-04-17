@@ -3,7 +3,7 @@ import type { ContextOptions, NodeType } from '../core/types.js';
 import { getContextForSymbol, getContextForFile } from '../ai/context-builder.js';
 import { analyzeImpact, formatImpactSummary } from '../operations/impact.js';
 import { findSimilar } from '../ai/embeddings.js';
-import { query } from '../operations/query.js';
+import { search, type SearchResult } from '../operations/query.js';
 import { findUnused, formatUnusedSummary } from '../operations/unused.js';
 import { reviewChanges, formatReviewSummary } from '../operations/review.js';
 
@@ -237,34 +237,33 @@ function handleSearchCode(projects: ProjectMap, args: Record<string, unknown>): 
   }
 
   const multiProject = projects.size > 1 && !projectFilter;
-  const allResults: Array<Record<string, unknown>> = [];
+  const matched: Array<{ project: string; result: SearchResult }> = [];
 
   for (const [name, entry] of targets) {
-    let q = query(entry.graph);
-    if (typeFilter) q = q.ofType(typeFilter);
-    if (fileFilter) {
-      if (fileFilter.includes('*')) {
-        q = q.inFile(new RegExp(fileFilter.replace(/\*/g, '.*')));
-      } else {
-        q = q.inFile(fileFilter);
-      }
-    }
-    q = q.withName(new RegExp(escapeRegex(searchQuery), 'i'));
+    const fileOpt = fileFilter
+      ? fileFilter.includes('*')
+        ? new RegExp(fileFilter.replace(/\*/g, '.*'))
+        : fileFilter
+      : undefined;
 
-    for (const node of q.results()) {
-      allResults.push({
-        ...(multiProject ? { project: name } : {}),
-        name: node.name,
-        type: node.type,
-        file: node.location?.file ?? null,
-        line: node.location?.startLine ?? null,
-        signature: node.signature || null,
-      });
+    for (const r of search(entry.graph, searchQuery, { type: typeFilter, file: fileOpt })) {
+      matched.push({ project: name, result: r });
     }
   }
 
+  if (targets.length > 1) matched.sort((a, b) => b.result.score - a.result.score);
+
+  const output = matched.map(({ project, result: { node } }) => ({
+    ...(multiProject ? { project } : {}),
+    name: node.name,
+    type: node.type,
+    file: node.location?.file ?? null,
+    line: node.location?.startLine ?? null,
+    signature: node.signature || null,
+  }));
+
   return {
-    content: [{ type: 'text', text: JSON.stringify(allResults, null, 2) }],
+    content: [{ type: 'text', text: JSON.stringify(output, null, 2) }],
   };
 }
 
@@ -523,10 +522,6 @@ function handleFindUnused(projects: ProjectMap, args: Record<string, unknown>): 
   return {
     content: [{ type: 'text', text: allSections.join('\n\n') }],
   };
-}
-
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function requireString(args: Record<string, unknown>, key: string): string | ToolResult {
