@@ -124,12 +124,36 @@ function writeRegistry(scopeDir: string, registry: GlobalRegistry): void {
   writeFileSync(path, JSON.stringify(registry, null, 2));
 }
 
-// Utility: list all globally tracked projects (scope-aware)
 export function listGlobalProjects(scope?: string): RegistryEntry[] {
   const resolvedScope = resolveScopeFromConfig(scope);
   const scopeDir = scopePath(resolvedScope, true);
   const registry = readRegistry(scopeDir);
   return Object.values(registry.projects);
+}
+
+export function listGlobalProjectsWithMeta(
+  scope?: string,
+): Array<RegistryEntry & { stats?: { nodes: number; edges: number; files: number } }> {
+  const resolvedScope = resolveScopeFromConfig(scope);
+  const scopeDir = scopePath(resolvedScope, true);
+  const registry = readRegistry(scopeDir);
+  const results: Array<
+    RegistryEntry & { stats?: { nodes: number; edges: number; files: number } }
+  > = [];
+
+  for (const [projectId, entry] of Object.entries(registry.projects)) {
+    const metaPath = join(scopeDir, 'projects', projectId, 'meta.json');
+    let stats: { nodes: number; edges: number; files: number } | undefined;
+    try {
+      if (existsSync(metaPath)) {
+        const meta = JSON.parse(readFileSync(metaPath, 'utf-8'));
+        stats = { nodes: meta.stats.nodes, edges: meta.stats.edges, files: meta.stats.files };
+      }
+    } catch {}
+    results.push({ ...entry, stats });
+  }
+
+  return results;
 }
 
 export function loadAllGlobalProjects(

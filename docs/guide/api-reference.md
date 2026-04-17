@@ -35,6 +35,7 @@ const graph = new CodeGraph();
 |--------|---------|-------------|
 | `getOutEdges(nodeId, edgeTypes?)` | `CodeEdge[]` | Outbound edges |
 | `getInEdges(nodeId, edgeTypes?)` | `CodeEdge[]` | Inbound edges |
+| `hasInEdgeOfType(nodeId, ...types)` | `boolean` | Check inbound edge type (zero alloc) |
 | `getSuccessors(nodeId, edgeTypes?)` | `CodeNode[]` | Outbound neighbors |
 | `getPredecessors(nodeId, edgeTypes?)` | `CodeNode[]` | Inbound neighbors |
 | `getNeighbors(nodeId, edgeTypes?)` | `CodeNode[]` | All neighbors |
@@ -90,6 +91,20 @@ import { query } from 'kc-graph';
 Returns a `GraphQuery` with chainable filters: `.ofType()`, `.inFile()`, `.withName()`, `.withContent()`, `.withEmbedding()`, `.withMetadata()`, `.withOutEdge()`, `.withInEdge()`, `.where()`.
 
 Terminators: `.results()`, `.count()`, `.first()`.
+
+### Search
+
+```typescript
+import { search } from 'kc-graph';
+```
+
+| Function | Description |
+|----------|-------------|
+| `search(graph, term, options?)` | Ranked search across name, qualifiedName, and file path |
+
+Options: `{ type?: NodeType, file?: string | RegExp }`.
+
+Returns `SearchResult[]` sorted by relevance score. Ranking considers: match location (name > qualifiedName > path), name precision (exact > starts-with > contains), node type (class > function > variable), and export status.
 
 ### Impact
 
@@ -166,16 +181,19 @@ import { parseTypeScriptSource, indexSourceFile, indexDocFile } from 'kc-graph';
 ## Storage (Chunked Persistence)
 
 ```typescript
-import { ChunkStore, resolveStore, createStore, initProject, syncProject } from 'kc-graph';
+import { ChunkStore, resolveStore, createStore, initProject, syncProject, lazyLoadGlobalProjects } from 'kc-graph';
 ```
 
 | Function / Class | Description |
 |------------------|-------------|
 | `initProject(options?)` | Index a project from scratch (returns `SyncResult`) |
 | `syncProject(options?)` | Incremental sync — only re-index changed files |
-| `removeProject(projectRoot, options?)` | Remove indexed data and registry entry |
+| `removeProject(projectRoot, options?)` | Remove indexed data and registry entry (accepts path or name) |
 | `resolveStore(projectRoot, options?)` | Find existing storage (local first, then global) |
 | `createStore(projectRoot, options?)` | Create new storage |
+| `lazyLoadGlobalProjects(scope?)` | Lazy-loading ProjectMap — graphs load on first access |
+| `loadAllGlobalProjects(scope?)` | Eager-loading variant (loads all graphs at startup) |
+| `listGlobalProjects(scope?)` | List registry entries without loading graphs |
 | `ChunkStore` | Low-level chunked storage (init, saveGraph, loadGraph, syncFiles, cleanup) |
 
 ### IndexOptions

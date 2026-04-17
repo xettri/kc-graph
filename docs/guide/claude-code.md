@@ -129,7 +129,7 @@ All tools search across all projects by default. Use the `project` parameter to 
 | Tool | Description | Input |
 |------|-------------|-------|
 | `list_projects` | List all indexed projects with stats | `{}` |
-| `search_code` | Find functions, classes, variables | `{ query, type?, file?, project? }` |
+| `search_code` | Ranked search by name, path, or file | `{ query, type?, file?, project? }` |
 | `get_context` | Token-optimized context for a symbol | `{ symbol?, file?, maxTokens?, project? }` |
 | `get_impact` | Change impact analysis | `{ symbol, file?, maxDepth?, project? }` |
 | `get_structure` | File structure overview | `{ path, project? }` |
@@ -251,13 +251,21 @@ To disable this (for static/fixed graphs):
 kc-graph mcp --global --no-reload
 ```
 
+## Listing Projects
+
+```bash
+kc-graph list --global            # table with stats
+kc-graph list --global --json     # machine-readable output
+```
+
 ## Removing Projects
 
 ```bash
-kc-graph remove ~/work/old-project --global --force
+kc-graph remove ~/work/old-project --global --force  # by path
+kc-graph remove old-project --global --force          # by name
 ```
 
-Deletes all indexed data and removes the project from the registry.
+Deletes all indexed data and removes the project from the registry. Accepts either the project path or its name.
 
 ## Keeping the Graph Updated
 
@@ -298,9 +306,9 @@ startMcpServer(singleProject('my-project', graph, '/path/to/project'));
 With scope:
 
 ```typescript
-import { loadAllGlobalProjects, startMcpServer } from 'kc-graph';
+import { lazyLoadGlobalProjects, startMcpServer } from 'kc-graph';
 
-const projects = loadAllGlobalProjects('develop');
+const projects = lazyLoadGlobalProjects('develop');
 startMcpServer(projects, 'develop');
 ```
 

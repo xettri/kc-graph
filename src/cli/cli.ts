@@ -8,6 +8,7 @@ import {
   loadAllGlobalProjects,
   lazyLoadGlobalProjects,
   listGlobalProjects,
+  listGlobalProjectsWithMeta,
   removeProject,
   getGlobalStoragePath,
 } from '../storage/resolver.js';
@@ -16,6 +17,7 @@ import { singleProject } from '../mcp/tools.js';
 import { startViewer } from './viewer.js';
 import { runWatch } from './watch.js';
 import { runStatus, timeSince } from './status.js';
+import { c } from './color.js';
 import {
   resolveScope,
   getActiveScope,
@@ -53,6 +55,7 @@ interface ParsedArgs {
   scope: string | undefined;
   force: boolean;
   noReload: boolean;
+  json: boolean;
   subcommand: string | undefined;
 }
 
@@ -68,6 +71,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   let scope: string | undefined;
   let force = false;
   let noReload = false;
+  let json = false;
   let subcommand: string | undefined;
 
   let positionalCount = 0;
@@ -87,6 +91,8 @@ function parseArgs(argv: string[]): ParsedArgs {
       force = true;
     } else if (arg === '--no-reload') {
       noReload = true;
+    } else if (arg === '--json') {
+      json = true;
     } else if (arg === '--scope' || arg === '-s') {
       if (i + 1 < args.length) {
         scope = args[++i]!;
@@ -126,69 +132,88 @@ function parseArgs(argv: string[]): ParsedArgs {
     scope,
     force,
     noReload,
+    json,
     subcommand,
   };
 }
 
 function printHelp(): void {
-  console.log(`
-kc-graph - Code intelligence graph for AI-optimized context retrieval
+  const h = c.bold;
+  const cmd = c.cyan;
+  const opt = c.yellow;
+  const dim = c.dim;
 
-Usage:
-  kc-graph <command> [path] [options]
-
-Commands:
-  init          Index a project and create the knowledge graph
-  sync          Update an existing graph (re-index changed files, remove deleted)
-  watch         Watch for file changes and auto-sync the graph
-  status        Show project graph status, staleness, and health metrics
-  view          Open interactive graph visualization in browser
-  mcp           Start MCP stdio server (for AI agent integration)
-  list          List indexed projects
-  remove        Remove a project's indexed data and registry entry
-  setup         Print MCP config snippet for Claude Code / Cursor
-  scope         Manage scoped environments (use, reset, list, delete)
-
-Arguments:
-  path          Project directory to index (default: current directory)
-
-Options:
-  -g, --global  Store graph in ~/.kc-graph/ instead of local .kc-graph/
-                For mcp: load all globally registered projects
-  -s, --scope   Use a named scope (e.g., --scope feature-x)
-  -f, --force   Skip branch safety check on sync / confirm destructive ops
-  --no-reload   Disable auto-reload in MCP server (static mode)
-  -P, --port    Port for the viewer server (default: 4242)
-  -V, --verbose Show each file being indexed
-  -h, --help    Show this help message
-  -v, --version Show version
-
-Examples:
-  kc-graph init                     Index current directory
-  kc-graph init ./my-project -g     Index and store globally
-  kc-graph sync                     Update the graph for current directory
-  kc-graph sync --global            Sync all globally registered projects
-  kc-graph sync --force             Sync even if branch has changed
-  kc-graph watch                    Watch for changes and auto-sync
-  kc-graph status                   Show graph health and staleness
-  kc-graph view                     Open graph viewer in browser
-  kc-graph mcp                      Start MCP server for current project
-  kc-graph mcp --global             Start MCP server for all global projects
-  kc-graph setup                    Show MCP config for Claude Code
-
-Scope management:
-  kc-graph scope                    Show active scope
-  kc-graph scope use <name>         Set the active scope
-  kc-graph scope reset              Reset to default scope
-  kc-graph scope list [--global]    List all scopes
-  kc-graph scope delete <name>      Delete a scope
-  kc-graph init -g -s feature-x     Index into a named scope
-`);
+  console.log('');
+  console.log(h('  kc-graph') + dim(' — code intelligence graph for AI context retrieval'));
+  console.log('');
+  console.log(h('  USAGE'));
+  console.log(`    ${cmd('kc-graph')} ${dim('<command>')} [path] [options]`);
+  console.log('');
+  console.log(h('  COMMANDS'));
+  console.log(`    ${cmd('init')}      Index a project and create the knowledge graph`);
+  console.log(`    ${cmd('sync')}      Update graph (re-index changed files, remove deleted)`);
+  console.log(`    ${cmd('watch')}     Watch for file changes and auto-sync`);
+  console.log(`    ${cmd('status')}    Show graph health, staleness, and connectivity`);
+  console.log(`    ${cmd('list')}      List indexed projects with stats`);
+  console.log(`    ${cmd('view')}      Open interactive graph visualization in browser`);
+  console.log(`    ${cmd('mcp')}       Start MCP stdio server for AI agent integration`);
+  console.log(`    ${cmd('setup')}     Print MCP config snippet for Claude Code / Cursor`);
+  console.log(`    ${cmd('remove')}    Remove indexed data and registry entry`);
+  console.log(`    ${cmd('scope')}     Manage scoped environments`);
+  console.log('');
+  console.log(h('  OPTIONS'));
+  console.log(
+    `    ${opt('-g')}, ${opt('--global')}    Use global storage ${dim('(~/.kc-graph/)')}`,
+  );
+  console.log(
+    `    ${opt('-s')}, ${opt('--scope')}     Use a named scope ${dim('(e.g., --scope feature-x)')}`,
+  );
+  console.log(
+    `    ${opt('-f')}, ${opt('--force')}     Skip safety checks / confirm destructive ops`,
+  );
+  console.log(`    ${opt('--json')}          Output as JSON ${dim('(list, status)')}`);
+  console.log(`    ${opt('--no-reload')}     Disable auto-reload in MCP server`);
+  console.log(`    ${opt('-P')}, ${opt('--port')}      Port for viewer ${dim('(default: 4242)')}`);
+  console.log(`    ${opt('-V')}, ${opt('--verbose')}   Show each file being indexed`);
+  console.log(`    ${opt('-h')}, ${opt('--help')}      Show this help message`);
+  console.log(`    ${opt('-v')}, ${opt('--version')}   Show version`);
+  console.log('');
+  console.log(h('  EXAMPLES'));
+  console.log(
+    `    ${dim('$')} kc-graph init                     ${dim('Index current directory')}`,
+  );
+  console.log(
+    `    ${dim('$')} kc-graph init ./my-project -g     ${dim('Index and store globally')}`,
+  );
+  console.log(
+    `    ${dim('$')} kc-graph sync --global            ${dim('Sync all global projects')}`,
+  );
+  console.log(
+    `    ${dim('$')} kc-graph list --global            ${dim('Show all indexed projects')}`,
+  );
+  console.log(
+    `    ${dim('$')} kc-graph mcp --global             ${dim('Start multi-project MCP server')}`,
+  );
+  console.log(
+    `    ${dim('$')} kc-graph view                     ${dim('Open graph viewer in browser')}`,
+  );
+  console.log('');
+  console.log(h('  SCOPES'));
+  console.log(`    ${dim('$')} kc-graph scope                    ${dim('Show active scope')}`);
+  console.log(
+    `    ${dim('$')} kc-graph scope use ${opt('<name>')}         ${dim('Set active scope')}`,
+  );
+  console.log(`    ${dim('$')} kc-graph scope reset              ${dim('Reset to default')}`);
+  console.log(`    ${dim('$')} kc-graph scope list               ${dim('List all scopes')}`);
+  console.log(
+    `    ${dim('$')} kc-graph scope delete ${opt('<name>')}      ${dim('Delete a scope')}`,
+  );
+  console.log('');
 }
 
 function scopePrefix(scope: string | undefined): string {
   const resolved = resolveScope(scope);
-  return resolved !== 'default' ? `[scope: ${resolved}] ` : '';
+  return resolved !== 'default' ? c.dim(`[${resolved}] `) : '';
 }
 
 async function runInit(args: ParsedArgs): Promise<void> {
@@ -196,11 +221,11 @@ async function runInit(args: ParsedArgs): Promise<void> {
   const prefix = scopePrefix(args.scope);
 
   if (!existsSync(root)) {
-    console.error(`${prefix}Error: directory not found: ${root}`);
+    console.error(`${prefix}${c.red('Error:')} directory not found: ${root}`);
     process.exit(1);
   }
 
-  console.log(`${prefix}Indexing ${root} ...`);
+  console.log(`${prefix}Indexing ${c.cyan(root)} ...`);
   const errors: string[] = [];
 
   const result = await initProject({
@@ -209,12 +234,12 @@ async function runInit(args: ParsedArgs): Promise<void> {
     scope: args.scope,
     onProgress: args.verbose
       ? (file, i, total) => {
-          process.stdout.write(`\r  [${i}/${total}] ${file}`);
+          process.stdout.write(`\r  ${c.dim(`[${i}/${total}]`)} ${file}`);
           if (i === total) process.stdout.write('\n');
         }
       : (_, i, total) => {
           if (i % 50 === 0 || i === total) {
-            process.stdout.write(`\r  Indexed ${i}/${total} files`);
+            process.stdout.write(`\r  Indexed ${c.bold(String(i))}/${total} files`);
             if (i === total) process.stdout.write('\n');
           }
         },
@@ -224,20 +249,20 @@ async function runInit(args: ParsedArgs): Promise<void> {
   });
 
   console.log('');
-  console.log(`Done in ${(result.duration / 1000).toFixed(1)}s`);
-  console.log(`  ${result.totalFiles} files indexed`);
+  console.log(`${c.green('Done')} in ${c.bold((result.duration / 1000).toFixed(1) + 's')}`);
+  console.log(`  ${c.bold(String(result.totalFiles))} files indexed`);
   console.log(`  ${result.totalNodes} nodes, ${result.totalEdges} edges`);
   console.log(`  ${result.totalChunks} chunks written`);
-  console.log(`  Saved to ${result.storagePath}`);
+  console.log(`  Saved to ${c.dim(result.storagePath)}`);
 
   if (errors.length > 0) {
     console.log('');
-    console.log(`Warnings (${errors.length} files failed to parse):`);
+    console.log(c.yellow(`Warnings (${errors.length} files failed to parse):`));
     for (const err of errors.slice(0, 10)) {
-      console.log(`  ${err}`);
+      console.log(`  ${c.yellow('!')} ${err}`);
     }
     if (errors.length > 10) {
-      console.log(`  ... and ${errors.length - 10} more`);
+      console.log(c.dim(`  ... and ${errors.length - 10} more`));
     }
   }
 }
@@ -248,18 +273,22 @@ async function runSync(args: ParsedArgs): Promise<void> {
   if (args.global && args.path === '.') {
     const projects = listGlobalProjects(args.scope);
     if (projects.length === 0) {
-      console.error(`${prefix}No projects found in scope. Run "kc-graph init --global" first.`);
+      console.error(
+        `${prefix}${c.red('No projects found.')} Run ${c.cyan('"kc-graph init --global"')} first.`,
+      );
       process.exit(1);
     }
 
-    console.log(`${prefix}Syncing ${projects.length} projects...`);
+    console.log(`${prefix}Syncing ${c.bold(String(projects.length))} projects...`);
     let totalAdded = 0,
       totalUpdated = 0,
       totalRemoved = 0;
 
     for (const entry of projects) {
       if (!existsSync(entry.path)) {
-        console.log(`${prefix}  ${entry.name}: skipped (directory not found)`);
+        console.log(
+          `${prefix}  ${c.cyan(entry.name)}: ${c.yellow('skipped')} ${c.dim('(directory not found)')}`,
+        );
         continue;
       }
       try {
@@ -269,24 +298,27 @@ async function runSync(args: ParsedArgs): Promise<void> {
           scope: args.scope,
           force: args.force,
           onError: (file, err) => {
-            if (args.verbose) console.error(`${prefix}  ${entry.name}: ${file}: ${err.message}`);
+            if (args.verbose)
+              console.error(`${prefix}  ${entry.name}: ${c.yellow(file)}: ${err.message}`);
           },
         });
         const parts: string[] = [];
-        if (result.added > 0) parts.push(`+${result.added}`);
-        if (result.updated > 0) parts.push(`~${result.updated}`);
-        if (result.removed > 0) parts.push(`-${result.removed}`);
-        const delta = parts.length > 0 ? parts.join(', ') : 'up to date';
-        console.log(`${prefix}  ${entry.name}: ${delta}`);
+        if (result.added > 0) parts.push(c.green(`+${result.added}`));
+        if (result.updated > 0) parts.push(c.yellow(`~${result.updated}`));
+        if (result.removed > 0) parts.push(c.red(`-${result.removed}`));
+        const delta = parts.length > 0 ? parts.join(', ') : c.dim('up to date');
+        console.log(`${prefix}  ${c.cyan(entry.name)}: ${delta}`);
         totalAdded += result.added;
         totalUpdated += result.updated;
         totalRemoved += result.removed;
       } catch (err) {
-        console.error(`${prefix}  ${entry.name}: error - ${(err as Error).message}`);
+        console.error(
+          `${prefix}  ${c.cyan(entry.name)}: ${c.red('error')} - ${(err as Error).message}`,
+        );
       }
     }
     console.log(
-      `${prefix}Done. +${totalAdded} added, ~${totalUpdated} updated, -${totalRemoved} removed`,
+      `${prefix}${c.green('Done.')} ${c.green(`+${totalAdded}`)} added, ${c.yellow(`~${totalUpdated}`)} updated, ${c.red(`-${totalRemoved}`)} removed`,
     );
     return;
   }
@@ -294,11 +326,11 @@ async function runSync(args: ParsedArgs): Promise<void> {
   const root = resolve(args.path);
 
   if (!existsSync(root)) {
-    console.error(`${prefix}Error: directory not found: ${root}`);
+    console.error(`${prefix}${c.red('Error:')} directory not found: ${root}`);
     process.exit(1);
   }
 
-  console.log(`${prefix}Syncing ${root} ...`);
+  console.log(`${prefix}Syncing ${c.cyan(root)} ...`);
   const errors: string[] = [];
 
   const result = await syncProject({
@@ -308,12 +340,12 @@ async function runSync(args: ParsedArgs): Promise<void> {
     force: args.force,
     onProgress: args.verbose
       ? (file, i, total) => {
-          process.stdout.write(`\r  [${i}/${total}] ${file}`);
+          process.stdout.write(`\r  ${c.dim(`[${i}/${total}]`)} ${file}`);
           if (i === total) process.stdout.write('\n');
         }
       : (_, i, total) => {
           if (i % 50 === 0 || i === total) {
-            process.stdout.write(`\r  Processed ${i}/${total} files`);
+            process.stdout.write(`\r  Processed ${c.bold(String(i))}/${total} files`);
             if (i === total) process.stdout.write('\n');
           }
         },
@@ -323,20 +355,24 @@ async function runSync(args: ParsedArgs): Promise<void> {
   });
 
   console.log('');
-  console.log(`${prefix}Done in ${(result.duration / 1000).toFixed(1)}s`);
-  console.log(`  +${result.added} added, ~${result.updated} updated, -${result.removed} removed`);
+  console.log(
+    `${prefix}${c.green('Done')} in ${c.bold((result.duration / 1000).toFixed(1) + 's')}`,
+  );
+  console.log(
+    `  ${c.green(`+${result.added}`)} added, ${c.yellow(`~${result.updated}`)} updated, ${c.red(`-${result.removed}`)} removed`,
+  );
   console.log(`  ${result.totalNodes} nodes, ${result.totalEdges} edges`);
   console.log(`  ${result.chunksWritten} chunks written, ${result.chunksDeleted} deleted`);
-  console.log(`  Saved to ${result.storagePath}`);
+  console.log(`  Saved to ${c.dim(result.storagePath)}`);
 
   if (errors.length > 0) {
     console.log('');
-    console.log(`Warnings (${errors.length} files failed to parse):`);
+    console.log(c.yellow(`Warnings (${errors.length} files failed to parse):`));
     for (const err of errors.slice(0, 10)) {
-      console.log(`  ${err}`);
+      console.log(`  ${c.yellow('!')} ${err}`);
     }
     if (errors.length > 10) {
-      console.log(`  ... and ${errors.length - 10} more`);
+      console.log(c.dim(`  ... and ${errors.length - 10} more`));
     }
   }
 }
@@ -347,7 +383,7 @@ async function runView(args: ParsedArgs): Promise<void> {
   if (args.global) {
     const projects = loadAllGlobalProjects(args.scope);
     if (projects.size === 0) {
-      console.error(`${prefix}No globally indexed projects found.`);
+      console.error(`${prefix}${c.red('No globally indexed projects found.')}`);
       process.exit(1);
     }
     startViewer(projects, { port: args.port });
@@ -357,15 +393,15 @@ async function runView(args: ParsedArgs): Promise<void> {
   const root = resolve(args.path);
 
   if (!existsSync(root)) {
-    console.error(`${prefix}Error: directory not found: ${root}`);
+    console.error(`${prefix}${c.red('Error:')} directory not found: ${root}`);
     process.exit(1);
   }
 
   const store = resolveStore(root, { global: false, scope: args.scope });
 
   if (!store.exists()) {
-    console.error(`No graph found for ${root}`);
-    console.error('Run "kc-graph init" first to index the project.');
+    console.error(`${c.red('No graph found for')} ${c.cyan(root)}`);
+    console.error(`Run ${c.cyan('"kc-graph init"')} first to index the project.`);
     process.exit(1);
   }
 
@@ -380,12 +416,11 @@ async function runMcp(args: ParsedArgs): Promise<void> {
     const projects = lazyLoadGlobalProjects(args.scope);
 
     if (projects.size === 0) {
-      console.error(`${prefix}No globally indexed projects found.`);
-      console.error('Index projects with: kc-graph init --global <path>');
+      console.error(`${prefix}${c.red('No globally indexed projects found.')}`);
+      console.error(`Index projects with: ${c.cyan('kc-graph init --global <path>')}`);
       process.exit(1);
     }
 
-    // Log project names from registry without loading graphs
     const registered = listGlobalProjects(args.scope);
     for (const entry of registered) {
       process.stderr.write(`${prefix}  ${entry.name}\n`);
@@ -405,15 +440,15 @@ async function runMcp(args: ParsedArgs): Promise<void> {
   const root = resolve(args.path);
 
   if (!existsSync(root)) {
-    console.error(`${prefix}Error: directory not found: ${root}`);
+    console.error(`${prefix}${c.red('Error:')} directory not found: ${root}`);
     process.exit(1);
   }
 
   const store = resolveStore(root, { global: false, scope: args.scope });
 
   if (!store.exists()) {
-    console.error(`${prefix}No graph found for ${root}`);
-    console.error('Run "kc-graph init" first to index the project.');
+    console.error(`${prefix}${c.red('No graph found for')} ${c.cyan(root)}`);
+    console.error(`Run ${c.cyan('"kc-graph init"')} first to index the project.`);
     process.exit(1);
   }
 
@@ -464,23 +499,98 @@ function runList(args: ParsedArgs): void {
   const prefix = scopePrefix(args.scope);
 
   if (args.global) {
-    const projects = listGlobalProjects(args.scope);
+    const projects = listGlobalProjectsWithMeta(args.scope);
     if (projects.length === 0) {
       console.log(`${prefix}No globally indexed projects.`);
       return;
     }
-    console.log(`${prefix}Globally indexed projects:\n`);
-    for (const entry of projects) {
-      const date = new Date(entry.lastSync).toLocaleDateString();
-      const branch = entry.branch ? ` (${entry.branch})` : '';
-      console.log(`  ${entry.name}${branch}`);
-      console.log(`    ${entry.path}  synced ${date}`);
+
+    if (args.json) {
+      console.log(
+        JSON.stringify(
+          projects.map((p) => ({
+            name: p.name,
+            path: p.path,
+            branch: p.branch ?? null,
+            lastSync: p.lastSync,
+            nodes: p.stats?.nodes ?? null,
+            edges: p.stats?.edges ?? null,
+            files: p.stats?.files ?? null,
+          })),
+          null,
+          2,
+        ),
+      );
+      return;
     }
-    console.log(`\n${projects.length} project(s)`);
+
+    const rows = projects.map((p) => ({
+      name: p.name,
+      branch: p.branch || '-',
+      files: String(p.stats?.files ?? '-'),
+      nodes: String(p.stats?.nodes ?? '-'),
+      edges: String(p.stats?.edges ?? '-'),
+      synced: timeSince(p.lastSync),
+    }));
+
+    const cols = {
+      name: Math.max(7, ...rows.map((r) => r.name.length)),
+      branch: Math.max(6, ...rows.map((r) => r.branch.length)),
+      files: Math.max(5, ...rows.map((r) => r.files.length)),
+      nodes: Math.max(5, ...rows.map((r) => r.nodes.length)),
+      edges: Math.max(5, ...rows.map((r) => r.edges.length)),
+      synced: Math.max(6, ...rows.map((r) => r.synced.length)),
+    };
+
+    const header = c.bold(
+      '  ' +
+        'Project'.padEnd(cols.name) +
+        '  ' +
+        'Branch'.padEnd(cols.branch) +
+        '  ' +
+        'Files'.padStart(cols.files) +
+        '  ' +
+        'Nodes'.padStart(cols.nodes) +
+        '  ' +
+        'Edges'.padStart(cols.edges) +
+        '  ' +
+        'Synced'.padEnd(cols.synced),
+    );
+
+    const sep = c.dim(
+      '  ' +
+        '─'.repeat(
+          cols.name + cols.branch + cols.files + cols.nodes + cols.edges + cols.synced + 10,
+        ),
+    );
+
+    console.log('');
+    console.log(header);
+    console.log(sep);
+
+    for (const r of rows) {
+      console.log(
+        '  ' +
+          c.cyan(r.name.padEnd(cols.name)) +
+          '  ' +
+          c.yellow(r.branch.padEnd(cols.branch)) +
+          '  ' +
+          r.files.padStart(cols.files) +
+          '  ' +
+          r.nodes.padStart(cols.nodes) +
+          '  ' +
+          r.edges.padStart(cols.edges) +
+          '  ' +
+          c.dim(r.synced.padEnd(cols.synced)),
+      );
+    }
+
+    console.log('');
+    console.log(c.dim(`  ${projects.length} project(s)`));
+    console.log('');
     return;
   }
 
-  // Local: check if current directory has indexed data
   const root = resolve(args.path);
   const store = resolveStore(root, { global: false, scope: args.scope });
 
@@ -491,14 +601,31 @@ function runList(args: ParsedArgs): void {
 
   const meta = store.readMeta();
   const name = basename(root);
-  const date = new Date(meta.lastSync).toLocaleDateString();
 
-  console.log(`${prefix}Local project:\n`);
-  console.log(`  ${name}`);
-  console.log(`    ${root}  synced ${date}`);
-  console.log(
-    `    ${meta.stats.nodes} nodes, ${meta.stats.edges} edges, ${meta.stats.files} files`,
-  );
+  if (args.json) {
+    console.log(
+      JSON.stringify(
+        {
+          name,
+          path: root,
+          lastSync: meta.lastSync,
+          nodes: meta.stats.nodes,
+          edges: meta.stats.edges,
+          files: meta.stats.files,
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+
+  console.log('');
+  console.log(`  ${c.bold(c.cyan(name))}`);
+  console.log(`  ${c.dim(root)}`);
+  console.log(`  ${meta.stats.files} files, ${meta.stats.nodes} nodes, ${meta.stats.edges} edges`);
+  console.log(`  ${c.dim('synced ' + timeSince(meta.lastSync))}`);
+  console.log('');
 }
 
 function runRemove(args: ParsedArgs): void {
@@ -506,10 +633,14 @@ function runRemove(args: ParsedArgs): void {
   const prefix = scopePrefix(args.scope);
 
   if (!args.force) {
-    const target = args.global ? `global project at ${root}` : `local storage for ${root}`;
-    console.error(`${prefix}This will permanently delete all indexed data for ${target}.`);
+    const target = args.global
+      ? `global project at ${c.cyan(root)}`
+      : `local storage for ${c.cyan(root)}`;
     console.error(
-      `Run with --force to confirm: kc-graph remove${args.path !== '.' ? ' ' + args.path : ''}${args.global ? ' --global' : ''}${args.scope ? ' --scope ' + args.scope : ''} --force`,
+      `${prefix}${c.yellow('This will permanently delete')} all indexed data for ${target}.`,
+    );
+    console.error(
+      `Run with ${c.bold('--force')} to confirm: ${c.dim(`kc-graph remove${args.path !== '.' ? ' ' + args.path : ''}${args.global ? ' --global' : ''}${args.scope ? ' --scope ' + args.scope : ''} --force`)}`,
     );
     process.exit(1);
   }
@@ -519,9 +650,9 @@ function runRemove(args: ParsedArgs): void {
       global: args.global,
       scope: args.scope,
     });
-    console.log(`${prefix}Removed ${name} (${storagePath})`);
+    console.log(`${prefix}${c.green('Removed')} ${c.cyan(name)} ${c.dim(`(${storagePath})`)}`);
   } catch (err) {
-    console.error(`${prefix}${(err as Error).message}`);
+    console.error(`${prefix}${c.red('Error:')} ${(err as Error).message}`);
     process.exit(1);
   }
 }
@@ -530,24 +661,24 @@ function runScope(args: ParsedArgs): void {
   const sub = args.subcommand;
 
   if (!sub) {
-    console.log(`Active scope: ${getActiveScope()}`);
+    console.log(`Active scope: ${c.cyan(getActiveScope())}`);
     return;
   }
 
   if (sub === 'use') {
     const name = args.path !== '.' ? args.path : undefined;
     if (!name || name === '.') {
-      console.error('Usage: kc-graph scope use <name>');
+      console.error(`Usage: kc-graph scope use ${c.yellow('<name>')}`);
       process.exit(1);
     }
     setActiveScope(name);
-    console.log(`Active scope set to: ${name}`);
+    console.log(`Active scope set to: ${c.cyan(name)}`);
     return;
   }
 
   if (sub === 'reset') {
     resetActiveScope();
-    console.log(`Active scope reset to: ${DEFAULT_SCOPE}`);
+    console.log(`Active scope reset to: ${c.cyan(DEFAULT_SCOPE)}`);
     return;
   }
 
@@ -557,12 +688,15 @@ function runScope(args: ParsedArgs): void {
       console.log('No scopes found.');
       return;
     }
-    console.log('  SCOPE'.padEnd(14) + 'PROJECTS'.padEnd(12) + 'LAST SYNC');
+    console.log(c.bold('  SCOPE'.padEnd(14) + 'PROJECTS'.padEnd(12) + 'LAST SYNC'));
+    console.log(c.dim('  ' + '─'.repeat(32)));
     for (const scope of scopes) {
-      const marker = scope.active ? '* ' : '  ';
-      const name = scope.name.padEnd(12);
+      const marker = scope.active ? c.green('* ') : '  ';
+      const name = (scope.active ? c.cyan(scope.name) : scope.name).padEnd(
+        scope.active ? 12 + 9 : 12,
+      ); // ANSI codes add length
       const count = String(scope.projectCount).padEnd(10);
-      const sync = scope.lastSync > 0 ? timeSince(scope.lastSync) : 'never';
+      const sync = scope.lastSync > 0 ? c.dim(timeSince(scope.lastSync)) : c.dim('never');
       console.log(`${marker}${name}${count}${sync}`);
     }
     return;
@@ -575,19 +709,23 @@ function runScope(args: ParsedArgs): void {
       process.exit(1);
     }
     if (!args.force) {
-      console.error(`This will permanently delete scope '${name}' and all its indexed data.`);
       console.error(
-        `Run with --force to confirm: kc-graph scope delete ${name}${args.global ? ' --global' : ''} --force`,
+        `${c.yellow('This will permanently delete')} scope '${c.cyan(name)}' and all its indexed data.`,
+      );
+      console.error(
+        `Run with ${c.bold('--force')} to confirm: ${c.dim(`kc-graph scope delete ${name}${args.global ? ' --global' : ''} --force`)}`,
       );
       process.exit(1);
     }
     deleteScope(name, args.global);
-    console.log(`Scope '${name}' deleted.`);
+    console.log(`${c.green('Deleted')} scope '${c.cyan(name)}'.`);
     return;
   }
 
-  console.error(`Unknown scope subcommand: ${sub}`);
-  console.error('Available: use, reset, list, delete');
+  console.error(`${c.red('Unknown scope subcommand:')} ${sub}`);
+  console.error(
+    `Available: ${c.cyan('use')}, ${c.cyan('reset')}, ${c.cyan('list')}, ${c.cyan('delete')}`,
+  );
   process.exit(1);
 }
 
@@ -595,7 +733,7 @@ async function main(): Promise<void> {
   const args = parseArgs(process.argv);
 
   if (args.version) {
-    console.log(`kc-graph v${VERSION}`);
+    console.log(`${c.bold('kc-graph')} ${c.dim('v' + VERSION)}`);
     return;
   }
 
@@ -644,8 +782,8 @@ async function main(): Promise<void> {
       runScope(args);
       break;
     default:
-      console.error(`Unknown command: ${args.command}`);
-      console.error('Run "kc-graph --help" for usage.');
+      console.error(`${c.red('Unknown command:')} ${args.command}`);
+      console.error(`Run ${c.cyan('"kc-graph --help"')} for usage.`);
       process.exit(1);
   }
 }

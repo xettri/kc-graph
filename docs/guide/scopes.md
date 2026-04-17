@@ -276,8 +276,9 @@ Remove a project's indexed data from a scope:
 # Remove local project
 kc-graph remove --force
 
-# Remove a specific global project
+# Remove a specific global project (by path or name)
 kc-graph remove ~/work/api-gateway --global --scope develop --force
+kc-graph remove api-gateway --global --scope develop --force
 
 # Remove entire scope (all projects)
 kc-graph scope delete develop --global --force
@@ -344,7 +345,7 @@ for (const s of scopes) {
 ### Use with storage APIs
 
 ```typescript
-import { initProject, syncProject, resolveStore, loadAllGlobalProjects } from 'kc-graph';
+import { initProject, syncProject, lazyLoadGlobalProjects } from 'kc-graph';
 
 // Init with scope
 await initProject({ root: '/path/to/project', global: true, scope: 'develop' });
@@ -352,6 +353,6 @@ await initProject({ root: '/path/to/project', global: true, scope: 'develop' });
 // Sync with scope
 await syncProject({ root: '/path/to/project', global: true, scope: 'develop' });
 
-// Load all projects in a scope
-const projects = loadAllGlobalProjects('develop');
+// Load all projects in a scope (lazy — graphs load on first access)
+const projects = lazyLoadGlobalProjects('develop');
 ```

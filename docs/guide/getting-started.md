@@ -143,11 +143,20 @@ kc-graph status
 
 Shows: last sync time, staleness (changed files since sync), node/edge counts, most connected symbols, and storage size.
 
-### 12. Remove a Project
+### 12. List Indexed Projects
 
 ```bash
-kc-graph remove --force          # remove local
-kc-graph remove --global --force  # remove from global store
+kc-graph list --global            # table with stats
+kc-graph list --global --json     # machine-readable JSON
+kc-graph list                     # local project info
+```
+
+### 13. Remove a Project
+
+```bash
+kc-graph remove --force                    # remove local
+kc-graph remove --global --force           # remove from global store
+kc-graph remove my-project --global --force # remove by project name
 ```
 
 ## Next Steps
