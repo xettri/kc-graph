@@ -55,8 +55,9 @@
     "docs:preview": "vitepress preview docs",
     "prerelease": "pnpm build && node scripts/prepare-npm.cjs",
     "release": "pnpm prerelease && cd dist && pnpm publish --access public",
+    "release:rc": "pnpm release --tag rc",
     "release:dry": "pnpm release --dry-run",
-    "prepare": "husky"
+    "prepare": "husky >/dev/null 2>&1 || true"
   },
   "keywords": [
     "knowledge-graph",

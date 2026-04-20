@@ -1,0 +1,69 @@
+name: Release RC Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_type:
+        description: 'Choose publish type: dry-run, rc'
+        required: true
+        default: 'dry-run'
+        type: choice
+        options:
+          - dry-run
+          - rc
+      confirm_publish:
+        description: 'Type YES to confirm publishing (required for rc release)'
+        required: false
+        default: ''
+
+permissions:
+  id-token: write
+
+jobs:
+  publish:
+    if: ${{(github.event.inputs.publish_type == 'rc' && github.event.inputs.confirm_publish == 'YES') || github.event.inputs.publish_type == 'dry-run' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm i --frozen-lockfile
+
+      - name: Check version for RC publishing
+        if: ${{ github.event.inputs.publish_type == 'rc' }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [[ ! "$VERSION" =~ rc ]]; then
+            echo "❌ Error: Cannot publish RC when package.json version ($VERSION) does not contain 'rc'"
+            echo "Please update your package.json version to include 'rc' (e.g., 1.0.0-rc.1)"
+            exit 1
+          fi
+          echo "✅ Version $VERSION is valid for RC publishing"
+
+      - name: Audit Signatures
+        run: npm audit signatures
+
+      - name: Publish package (dry)
+        if: ${{github.event.inputs.publish_type == 'dry-run' }}
+        run: pnpm release:dry --no-git-checks
+
+      - name: RC Publish
+        if: ${{ github.event.inputs.publish_type == 'rc' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          REF: ${{ github.ref }}
+        run: pnpm release:rc --no-git-checks
